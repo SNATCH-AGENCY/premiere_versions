@@ -13,7 +13,7 @@ The public release feed is hosted in this repository. Publish the verified relea
 5. Use `python3 tools/sign_release.py /path/to/app.app /path/to/output` to create a pristine ZIP and an official generated/signed appcast using the Keychain-backed signing tools. No private key is exported and nothing is uploaded.
 6. After review and a successful real-update report, publish the archive in GitHub Releases, then publish appcast.xml as docs/appcast.xml. The feed must point to an already-available archive. No public test releases are needed.
 
-Machine bundle version is version.build (4.5.1); PVBuildNumber is the displayed build (1). Keep the bundle identifier and Premiere Versions.app filename stable across updates.
+Machine bundle version is version.build (4.6.1); PVBuildNumber is the displayed build (1). Keep the bundle identifier and Premiere Versions.app filename stable across updates.
 
 Provide a short tested first-launch README beside the release archive. Apple Developer ID/notarization are not configured. The Sparkle signature authenticates updates but does not replace macOS application trust.
 

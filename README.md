@@ -34,14 +34,11 @@ Choose English or Russian, your save locations and a built-in or custom icon. Yo
 
 The app quietly checks for updates at launch and every six hours. Use **Check updates** in Settings any time; you choose when to install. You can hide the Dock icon and keep the app in the menu bar instead.
 
-## What’s new in 4.5
+## What’s new in 4.6
 
-- **Project selection:** a dedicated screen, clearer navigation and reliable handling of missing or moved projects.
-- **Icons and appearance:** a compact picker, two new built-in styles, removable custom icons and the option to hide the Dock icon.
-- **Keyboard shortcuts:** clearer setup and English key labels when recording a shortcut.
-- **Updates:** quiet checks at launch and every six hours, with subtle indicators. You choose when to install.
-- **Interface refinements:** softer blur transitions, cleaner help controls and short-term memory for the Settings scroll position.
-- **Optimization:** reduced background activity, fewer repeated archive checks and no animation polling while the utility is hidden.
+- **A frosted background, your way.** Adjust background opacity from 15% to 100%, with clear text and controls. Your choice is remembered.
+- **Quicker navigation.** A larger project control and immediate click access to helper panels, alongside hover.
+- **Smoother transitions.** Panels dissolve with blur and opacity, without a dark overlay.
 
 ## Your work stays yours
 

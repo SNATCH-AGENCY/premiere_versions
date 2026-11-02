@@ -11,6 +11,7 @@ for p in (root/'Premiere Versions').glob('*.swift'):
         a=s.index('    init() {',s.index('final class AutosaveMonitor'));b=s.index('    func start()',a)
         s=s[:a]+'    init() {}\n\n'+s[b:]
     if p.name=='ContentView.swift':
+        s=s.replace('        .onChange(of: logoVariant) {', '        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestDismissPanel"))) { _ in dismissPanel() }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestInspectPanel"))) { _ in\n            NotificationCenter.default.post(name: Notification.Name("PVTestPanelState"), object: nil, userInfo: ["visible": activePanel != nil, "centered": panelCentered])\n        }\n        .onChange(of: logoVariant) {')
         s=s.replace('struct ContentView: View {','''struct ContentView: View {
     init(previewPanel: String = "version") {
         _sourceProjectURL = State(initialValue: URL(fileURLWithPath: "/private/tmp/project.prproj"))
@@ -63,6 +64,8 @@ shutil.copy(root / "Premiere Versions/Translations.json", out / "Translations.js
 
 for language in ["en", "ru"]:
     subprocess.run([str(out/'PV43RenderChecks'), '-interfaceLanguage', language, '-pvRenderOutput', str(out), '-pvRenderAssets', str(root/'Premiere Versions/Assets.xcassets')], check=True)
+translucent=out/'opacity-15';translucent.mkdir()
+subprocess.run([str(out/'PV43RenderChecks'), '-interfaceLanguage', 'en', '-windowBackgroundOpacity', '0.15', '-pvRenderOutput', str(translucent), '-pvRenderAssets', str(root/'Premiere Versions/Assets.xcassets')], check=True)
 print('Native interface snapshots:', out)
 
 # Keep the review snapshots, not another copy of compiler caches.

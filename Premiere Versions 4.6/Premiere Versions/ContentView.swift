@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 import Carbon
 
 struct ContentView: View {
+    @AppStorage("windowBackgroundOpacity") private var windowBackgroundOpacity = 1.0
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    private var backdropOpacity: Double { PVWindowAppearance.opacity(windowBackgroundOpacity, reduceTransparency: reduceTransparency) }
     @AppStorage("showInDock") private var showInDock = true
     @AppStorage("menuBarIconEnabled") private var menuBarIconEnabled = false
     @AppStorage("archivePath")
@@ -24,6 +27,10 @@ struct ContentView: View {
     @State private var didRestore = false
     private enum Panel: Equatable { case settings, backups, shortcut, help, logoEditor }
     @State private var activePanel: Panel?
+    @State private var panelProgress = 1.0
+    @State private var panelClosing = false
+    @State private var panelDismissTask: Task<Void, Never>?
+    private var panelStrength: Double { activePanel == nil ? 0 : panelProgress }
     @State private var panelPinned = false
     @State private var panelCentered = false
     @State private var panelHovered = false
@@ -40,19 +47,19 @@ struct ContentView: View {
     @State private var hoverTask: Task<Void, Never>?
     private var showingSettings: Bool {
         get { activePanel == .settings }
-        nonmutating set { if newValue { openPanel(.settings) } else if activePanel == .settings { activePanel = nil } }
+        nonmutating set { if newValue { openPanel(.settings) } else if activePanel == .settings { dismissPanel() } }
     }
     private var showingShortcutEditor: Bool {
         get { activePanel == .shortcut }
-        nonmutating set { if newValue { openPanel(.shortcut) } else if activePanel == .shortcut { activePanel = nil } }
+        nonmutating set { if newValue { openPanel(.shortcut) } else if activePanel == .shortcut { dismissPanel() } }
     }
     private var showingHelp: Bool {
         get { activePanel == .help }
-        nonmutating set { if newValue { openPanel(.help) } else if activePanel == .help { activePanel = nil } }
+        nonmutating set { if newValue { openPanel(.help) } else if activePanel == .help { dismissPanel() } }
     }
     private var showingLogoEditor: Bool {
         get { activePanel == .logoEditor }
-        nonmutating set { if newValue { openPanel(.logoEditor) } else if activePanel == .logoEditor { activePanel = nil } }
+        nonmutating set { if newValue { openPanel(.logoEditor) } else if activePanel == .logoEditor { dismissPanel() } }
     }
     @State private var showingWelcome = PVWelcomePolicy.needsPresentation()
     @State private var welcomeTransitioning = false
@@ -103,8 +110,12 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
+                if backdropOpacity < 1 {
+                    PVFrostedBackdrop().allowsHitTesting(false)
+                }
                 PVAnimatedBackdrop(active: visualsActive && visibleWindow)
-                    .blur(radius: activePanel == nil ? 0 : 3)
+                    .opacity(backdropOpacity)
+                    .blur(radius: reduceMotion ? 0 : 3 * panelStrength)
                 if showingWelcome {
                     welcomePage
                         .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -60)))
@@ -116,8 +127,8 @@ struct ContentView: View {
                         stagedComposer
                         Color.clear.frame(height: footerHeight)
                     }
-                    .blur(radius: activePanel == nil ? 0 : 3)
-                    .opacity(activePanel == nil ? 1 : 0.55)
+                    .blur(radius: reduceMotion ? 0 : 3 * panelStrength)
+                    .opacity(1 - 0.3 * panelStrength)
                     .allowsHitTesting(activePanel == nil && !welcomeTransitioning)
                     VStack(spacing: 0) {
                         header.padding(.top, 28)
@@ -128,28 +139,30 @@ struct ContentView: View {
                             }
                         }
                     }
-                    .blur(radius: activePanel == nil ? 0 : 3)
-                    .opacity(activePanel == nil ? 1 : 0.5)
+                    .blur(radius: reduceMotion ? 0 : 3 * panelStrength)
+                    .opacity(1 - 0.3 * panelStrength)
                     .allowsHitTesting(activePanel == nil && !welcomeTransitioning)
                     if let activePanel {
-                        Color.black.opacity(0.24).contentShape(Rectangle())
+                        Color.clear.contentShape(Rectangle())
                             .onTapGesture { dismissPanel() }
-                        panelBody(maxHeight: max(260, geometry.size.height - 32))
+                        panelBody(panel: activePanel, maxHeight: max(260, geometry.size.height - 32))
                             .contentShape(RoundedRectangle(cornerRadius: 18))
                             .onHover { inside in
                                 panelHovered = inside
                                 panelCloseTask?.cancel()
-                                if !inside && !panelPinned { schedulePanelClose(activePanel) }
+                                if !inside && !panelPinned && !panelClosing { schedulePanelClose(activePanel) }
                             }
-                            .position(panelPosition(in: geometry.size))
-                            .transition(.modifier(active: PVPanelFade(amount: 1), identity: PVPanelFade(amount: 0)))
-                            .transition(.opacity)
+                            .position(panelPosition(for: activePanel, in: geometry.size))
+                            .compositingGroup()
+                            .blur(radius: reduceMotion ? 0 : (1 - panelProgress) * 12)
+                            .opacity(panelProgress)
+                            .allowsHitTesting(!panelClosing)
+                            .zIndex(2)
                     }
                     }
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 80)))
                 }
             }
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.38), value: activePanel)
             .onPreferenceChange(PVFooterHeight.self) { footerHeight = $0 }
         }
         .ignoresSafeArea()
@@ -173,7 +186,7 @@ struct ContentView: View {
             if panel != nil { clearTextFocus() }
             else if panel == nil { restoreComposerFocus() }
         }
-        .onDisappear { hoverTask?.cancel(); stageFocusTask?.cancel(); welcomeTask?.cancel(); panelCloseTask?.cancel() }
+        .onDisappear { hoverTask?.cancel(); stageFocusTask?.cancel(); welcomeTask?.cancel(); panelCloseTask?.cancel(); panelDismissTask?.cancel() }
         .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
             if activePanel != nil { panelPinned = true; panelCloseTask?.cancel() }
         }
@@ -230,9 +243,9 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func panelBody(maxHeight: CGFloat) -> some View {
+    private func panelBody(panel: Panel, maxHeight: CGFloat) -> some View {
         Group {
-            switch activePanel {
+            switch panel {
             case .settings:
                 VStack(alignment: .leading, spacing: 18) {
                     HStack {
@@ -289,8 +302,6 @@ struct ContentView: View {
                         showingLogoEditor = false
                     }, close: { showingLogoEditor = false })
                 }.frame(width: 470, height: min(420, maxHeight)).background(theme.panel)
-            case nil:
-                EmptyView()
             }
         }
         .modifier(PVFloatingSurface())
@@ -320,6 +331,9 @@ struct ContentView: View {
     }
 
     private func openPanel(_ panel: Panel, pinned: Bool = true, centered: Bool = false) {
+        let wasOpen = activePanel != nil
+        panelDismissTask?.cancel()
+        panelClosing = false
         if activePanel == .settings && panel != .settings { settingsScroll.closedAt = Date() }
         if panel == .settings && activePanel != .settings { settingsScroll.prepareToOpen(); updateScrollRequest = 0 }
         panelCentered = centered || panel == .logoEditor
@@ -332,18 +346,38 @@ struct ContentView: View {
         }
         hoverTask?.cancel()
         hoverIntent = nil
+        if !wasOpen { panelProgress = 0 }
         activePanel = panel
+        panelDismissTask = Task { @MainActor in
+            // Install the surface at zero opacity before starting its reveal.
+            do { try await Task.sleep(nanoseconds: 16_000_000) } catch { return }
+            guard !Task.isCancelled, activePanel == panel, !panelClosing else { return }
+            withAnimation(.easeInOut(duration: reduceMotion ? 0.15 : 0.36)) { panelProgress = 1 }
+        }
     }
 
     private func dismissPanel() {
+        guard activePanel != nil, !panelClosing else { return }
         if activePanel == .settings { settingsScroll.closedAt = Date() }
-        panelCentered = false
-        panelHovered = false
         panelCloseTask?.cancel()
-        panelPinned = false
+        panelDismissTask?.cancel()
         hoverTask?.cancel()
         hoverIntent = nil
-        activePanel = nil
+        panelClosing = true
+        let duration = reduceMotion ? 0.15 : 0.36
+        withAnimation(.easeInOut(duration: duration)) { panelProgress = 0 }
+        panelDismissTask = Task { @MainActor in
+            do { try await Task.sleep(nanoseconds: UInt64((duration + 0.02) * 1_000_000_000)) } catch { return }
+            guard !Task.isCancelled, panelClosing else { return }
+            // Keep content, anchor and color intact until the fade has completed.
+            var transaction = Transaction(); transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                activePanel = nil
+                panelClosing = false
+                panelHovered = false
+                panelPinned = false
+            }
+        }
     }
 
     private func schedulePanel(_ panel: Panel, hovering: Bool) {
@@ -361,17 +395,16 @@ struct ContentView: View {
         }
     }
 
-    private func panelPosition(in size: CGSize) -> CGPoint {
+    private func panelPosition(for panel: Panel, in size: CGSize) -> CGPoint {
         if panelCentered { return CGPoint(x: size.width / 2, y: size.height / 2) }
         let dimensions: CGSize
         let available = size.height - 32
-        switch activePanel {
+        switch panel {
         case .settings: dimensions = CGSize(width: 510, height: min(420, available))
         case .backups: dimensions = CGSize(width: 510, height: min(310, available))
         case .help: dimensions = CGSize(width: 440, height: min(360, available))
         case .shortcut: dimensions = CGSize(width: 340, height: min(310, available))
         case .logoEditor: dimensions = CGSize(width: 470, height: min(420, available))
-        case nil: dimensions = .zero
         }
         let half = CGSize(width: dimensions.width / 2, height: dimensions.height / 2)
         return CGPoint(x: min(max(panelAnchor.x, half.width + 16), size.width - half.width - 16),
@@ -382,7 +415,7 @@ struct ContentView: View {
         panelCloseTask?.cancel()
         panelCloseTask = Task { @MainActor in
             do { try await Task.sleep(nanoseconds: 160_000_000) } catch { return }
-            if !panelPinned && activePanel == panel { dismissPanel() }
+            if !panelPinned && activePanel == panel && !panelClosing { dismissPanel() }
         }
     }
 
@@ -455,12 +488,14 @@ struct ContentView: View {
                 .accessibilityLabel(PVL("Информация: ") + AppRelease.label)
                 .accessibilityAction { openPanel(.help, centered: true) }
                 .onHover { schedulePanel(.help, hovering: $0) }
+                    .onTapGesture { openPanel(.help, pinned: false) }
             Image(systemName: "gearshape")
                 .overlay(alignment: .topTrailing) { if updates.available != nil { Circle().fill(Color(red: 0.85, green: 0.43, blue: 0.47)).frame(width: 5, height: 5).offset(x: 4, y: -2) } }
                 .padding(.leading, 14).frame(width: 24, height: 28).contentShape(Rectangle())
                 .help(PVL("Настройки")).accessibilityLabel(PVL("Настройки"))
                 .accessibilityAction { openPanel(.settings, centered: true) }
                 .onHover { schedulePanel(.settings, hovering: $0) }
+                    .onTapGesture { openPanel(.settings, pinned: false) }
 
         }
         .foregroundStyle(theme.muted)
@@ -473,7 +508,8 @@ struct ContentView: View {
                 Text(projectName.isEmpty ? PVL("Выбрать проект") : projectName)
                     .font(.system(size: 20, weight: .regular)).lineLimit(1).truncationMode(.middle)
                 Image(systemName: "chevron.up").font(.system(size: 11, weight: .light))
-            }.padding(.horizontal, 30).padding(.vertical, 5)
+            }.padding(.horizontal, 30).padding(.vertical, 14)
+                .frame(minWidth: 240).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(sourceProjectURL?.path ?? PVL("Выбрать проект Premiere Pro"))
@@ -799,6 +835,21 @@ struct ContentView: View {
                 settingPathRow(title: PVL("Куда сохранять автосейвы"), path: autosaveArchivePath,
                                buttonTitle: PVL("Изменить…"), action: chooseAutosaveArchiveFolder)
                 Divider().overlay(theme.border)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(PVL("Непрозрачность фона")).font(.system(size: 13, weight: .medium))
+                        Spacer()
+                        Text("\(Int((backdropOpacity * 100).rounded()))%")
+                            .font(.system(size: 11, design: .monospaced)).foregroundStyle(theme.muted)
+                    }
+                    Slider(value: Binding(get: { PVWindowAppearance.opacity(windowBackgroundOpacity) }, set: { windowBackgroundOpacity = $0 }), in: 0.15...1)
+                        .controlSize(.small).tint(theme.muted)
+                        .disabled(reduceTransparency)
+                        .accessibilityLabel(PVL("Непрозрачность фона"))
+                    if reduceTransparency {
+                        Text(PVL("В macOS включено уменьшение прозрачности")).font(.system(size: 10)).foregroundStyle(theme.muted)
+                    }
+                }
                 Toggle(PVL("Показывать в Dock"), isOn: Binding(
                     get: { showInDock },
                     set: { value in if !value { menuBarIconEnabled = true }; showInDock = value }))
@@ -934,6 +985,7 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .regular))
                     .contentShape(Rectangle())
                     .onHover { schedulePanel(.backups, hovering: $0) }
+                    .onTapGesture { openPanel(.backups, pinned: false) }
                     .accessibilityAction { openPanel(.backups, centered: true) }
                     .help(PVL(autosaveMonitor.status) + PVL("\nНаведи, чтобы открыть резервное копирование"))
                 Spacer()
@@ -941,6 +993,7 @@ struct ContentView: View {
                     .contentShape(Rectangle()).help(PVL("Изменить сочетание клавиш"))
                     .accessibilityAction { openPanel(.shortcut, centered: true) }
                     .onHover { schedulePanel(.shortcut, hovering: $0) }
+                    .onTapGesture { openPanel(.shortcut, pinned: false) }
 
             }
         }
@@ -1504,7 +1557,7 @@ private final class ShortcutCaptureNSView: NSView {
 }
 
 nonisolated enum AppRelease {
-    static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "4.5" }
+    static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "4.6" }
     static var build: String { Bundle.main.infoDictionary?["PVBuildNumber"] as? String ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1" }
     static var label: String { version + " · Build " + build }
     static let author = "pewakkk"
@@ -1604,13 +1657,14 @@ private struct PVHelpView: View {
                 }
             }
             Divider().overlay(theme.border)
-            section(PVL("Первый запуск"), PVL("Обычный запуск и клик по Dock открывают окно поверх других окон. После установки или обновления появляется приветствие. Сочетание работает только когда Premiere Pro — активное приложение. Enter или прокрутка вниз открывают главный экран. Панели открываются только наведением и закрываются при уходе мыши. Настройки из Check updates и редактор логотипа открываются в центре окна. В настройках можно включить монохромный значок строки меню: нажатие открывает программу, правое нажатие — меню выхода. Esc закрывает панель, возвращает к версии или скрывает главное окно в фон."))
+            section(PVL("Первый запуск"), PVL("Обычный запуск и клик по Dock открывают окно поверх других окон. После установки или обновления появляется приветствие. Сочетание работает только когда Premiere Pro — активное приложение. Enter или прокрутка вниз открывают главный экран. Панели открываются наведением или сразу по нажатию и закрываются при уходе мыши. Настройки из Check updates и редактор логотипа открываются в центре окна. В настройках можно включить монохромный значок строки меню: нажатие открывает программу, правое нажатие — меню выхода. Esc закрывает панель, возвращает к версии или скрывает главное окно в фон."))
             section(PVL("Сохранение"), PVL("Версия → Enter → комментарий → Enter. Прокрутка вниз открывает комментарий, вверх возвращает к версии. Возврат также — ← version или Esc. Комментарий необязателен. Копируется файл на диске: сначала сохрани изменения в Premiere. Ручные версии автоматически не удаляются. Кнопки press return работают и мышью."))
             section(PVL("Резервные копии"), PVL("Проверка раз в \(Int(BackupPolicy.checkInterval)) с; файл должен быть стабилен \(Int(BackupPolicy.stableDelay)) с. Файлы и папки с autosave / auto-save / auto save, готовые автосейвы Premiere и наши архивы пропускаются. Имя содержит статус recent/hourly/daily, местную дату изменения проекта и окончание autosave."))
             section(PVL("Хранение"), PVL("recent — \(BackupPolicy.recentCount) последних; hourly — почасовые за \(BackupPolicy.hourlyHours) часов; daily — дневные за \(BackupPolicy.dailyDays) дней. После новой копии обновляются статусы и удаляются лишние файлы только в резервном архиве."))
             section(PVL("Доступ и фон"), PVL("Поиск — на разрешённых дисках или в выбранной папке. Статус внизу открывает только резервное копирование; шестерёнка — настройки: папки, значки, затем тот же блок копирования. Изменения синхронизированы. Закрытие — Esc или нажатие снаружи. Программа работает до полного выхода; автозапуска пока нет."))
             section(PVL("Выбор проекта"), PVL("Если проект не выбран или недоступен, выбери файл на отдельном экране. После выбора Enter или прокрутка вниз открывают версию. Название проекта со стрелкой вверх возвращает к выбору; прокрутка вверх с версии туда не ведёт. Удалённый проект больше не считается активным."))
             section(PVL("Настройки и обновления"), PVL("Прокрутка настроек сохраняется на 10 секунд после закрытия. Значок Dock можно скрыть, сохранив доступ через строку меню. Проверки обновлений идут в фоне при запуске и раз в 6 часов; коралловая точка сообщает о новой версии. Установка остаётся ручной."))
+            section(PVL("Прозрачность"), PVL("В настройках можно менять плотность фона от 15% до 100%. При уменьшении за окном остаётся матовое размытие, текст и кнопки сохраняют читаемость. Выбор запоминается. При включённом уменьшении прозрачности в macOS используется непрозрачный фон."))
             section(PVL("Клавиши и логотип"), PVL("Сейчас: \(hotKey.shortcut.display). Сочетание работает в активном Premiere Pro. При записи используется английская раскладка, прежняя возвращается после завершения. Наведение открывает настройки; запись начинается отдельным нажатием. Встроенные логотипы находятся в приложении. Выбор Dock и два пользовательских варианта сохраняются между версиями. Выбранный значок сохраняется и для закрытого приложения после разрешения доступа к папке программы. При обновлении он применяется к запущенной новой версии, старые архивные приложения не меняются."))
             Divider().overlay(theme.border)
             Button(PVL("Проверить обновления"), action: checkUpdates).buttonStyle(PVQuietButtonStyle())

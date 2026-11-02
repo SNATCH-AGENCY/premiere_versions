@@ -720,8 +720,8 @@
     "en": "First launch"
   },
   {
-    "ru": "Обычный запуск и клик по Dock открывают окно поверх других окон. После установки или обновления появляется приветствие. Сочетание работает только когда Premiere Pro — активное приложение. Enter или прокрутка вниз открывают главный экран. Панели открываются только наведением и закрываются при уходе мыши. Настройки из Check updates и редактор логотипа открываются в центре окна. В настройках можно включить монохромный значок строки меню: нажатие открывает программу, правое нажатие — меню выхода. Esc закрывает панель, возвращает к версии или скрывает главное окно в фон.",
-    "en": "Launching the app or clicking its Dock icon brings the window to the front. After installation or an update, the welcome appears. The shortcut works only while Premiere Pro is the frontmost app. Return or scroll down opens the main screen. Panels open on hover and close when the pointer leaves. Settings from Check updates and the logo editor open in the center of the window. Settings can enable a monochrome menu bar icon: click to open the app, right-click for the quit menu. Esc closes a panel, returns to version or hides the main window."
+    "ru": "Обычный запуск и клик по Dock открывают окно поверх других окон. После установки или обновления появляется приветствие. Сочетание работает только когда Premiere Pro — активное приложение. Enter или прокрутка вниз открывают главный экран. Панели открываются наведением или сразу по нажатию и закрываются при уходе мыши. Настройки из Check updates и редактор логотипа открываются в центре окна. В настройках можно включить монохромный значок строки меню: нажатие открывает программу, правое нажатие — меню выхода. Esc закрывает панель, возвращает к версии или скрывает главное окно в фон.",
+    "en": "Launching the app or clicking its Dock icon brings the window to the front. After installation or an update, the welcome appears. The shortcut works only while Premiere Pro is the frontmost app. Return or scroll down opens the main screen. Panels open on hover or immediately on click and close when the pointer leaves. Settings from Check updates and the logo editor open in the center of the window. Settings can enable a monochrome menu bar icon: click to open the app, right-click for the quit menu. Esc closes a panel, returns to version or hides the main window."
   },
   {
     "ru": "Сохранение",
@@ -874,5 +874,21 @@
   {
     "ru": "Esc — отменить.",
     "en": "Esc to cancel."
+  },
+  {
+    "ru": "Непрозрачность фона",
+    "en": "Background opacity"
+  },
+  {
+    "ru": "В macOS включено уменьшение прозрачности",
+    "en": "Reduce Transparency is enabled in macOS"
+  },
+  {
+    "ru": "Прозрачность",
+    "en": "Transparency"
+  },
+  {
+    "ru": "В настройках можно менять плотность фона от 15% до 100%. При уменьшении за окном остаётся матовое размытие, текст и кнопки сохраняют читаемость. Выбор запоминается. При включённом уменьшении прозрачности в macOS используется непрозрачный фон.",
+    "en": "Settings can adjust background opacity from 15% to 100%. Lower values reveal a frosted backdrop while text and controls remain readable. Your choice is remembered. macOS Reduce Transparency keeps the background opaque."
   }
 ]

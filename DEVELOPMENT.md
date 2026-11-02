@@ -4,16 +4,16 @@ Technical notes retained from the initial release preparation. For publication s
 
 ## Build
 
-Open `Premiere Versions 4.5/Premiere Versions.xcodeproj` in Xcode. Select the **Premiere Versions** scheme and **My Mac**. Current project deployment target: **macOS 26.6.2**. Compatibility with older macOS releases has not been verified.
+Open `Premiere Versions 4.6/Premiere Versions.xcodeproj` in Xcode. Select the **Premiere Versions** scheme and **My Mac**. Current project deployment target: **macOS 26.6.2**. Compatibility with older macOS releases has not been verified.
 
-Before building, run `python3 "Premiere Versions 4.5/tools/enable_sparkle.py"` to download and verify the official SDK. For an already-downloaded archive, pass `--archive /path/to/Sparkle-2.10.1.tar.xz`. Vendor/ is intentionally ignored. See [release setup](RELEASE_SETUP.md). The current local build targets Apple Silicon (arm64).
+Before building, run `python3 "Premiere Versions 4.6/tools/enable_sparkle.py"` to download and verify the official SDK. For an already-downloaded archive, pass `--archive /path/to/Sparkle-2.10.1.tar.xz`. Vendor/ is intentionally ignored. See [release setup](RELEASE_SETUP.md). The current local build targets Apple Silicon (arm64).
 
 ## Usage
 
 - Launching the app or clicking its Dock icon brings its window to the front. The welcome appears once per new version/build.
 - With Premiere Pro frontmost, open with Option+S; choose a project and enter a version. Return opens the optional comment; another Return saves.
 - Scroll between version/comment. Escape closes a panel, returns to version, then hides the window; the app keeps running.
-- Hover over helper controls for a temporary panel; use the centered editor for explicit editing actions. Click outside or press Escape to dismiss.
+- Hover over helper controls or click for immediate access to a temporary panel; use the centered editor for explicit editing actions. Click outside or press Escape to dismiss.
 - Settings can enable an optional monochrome menu bar icon; macOS adapts its color. Click opens the app; right-click offers Open and Quit.
 - Settings contains the En/Ru language menu, locations, Dock icons, backups and update checks.
 - New installs default to English and the graphite icon. Existing locations, shortcuts, icons and user settings are preserved.
@@ -28,7 +28,7 @@ Do not commit real projects, user preferences, access bookmarks, build logs or p
 
 ## Testing
 
-Engine, icon history, native Escape routing, localization, appcast handling and native interface checks are in `Premiere Versions 4.5/Tests`. They use temporary fixtures.
+Engine, icon history, native Escape routing, localization, appcast handling and native interface checks are in `Premiere Versions 4.6/Tests`. They use temporary fixtures.
 
 ## License
 

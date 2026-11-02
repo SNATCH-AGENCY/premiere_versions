@@ -23,7 +23,9 @@ import AppKit
             }
         }
         for size in [NSSize(width: 720, height: 540)] {
-        for mode in ["version", "comment", "settings", "settings-centered", "backups", "shortcut", "help", "logoEditor", "welcome", "welcome-hidden", "project", "project-ready", "project-missing"] {
+        let translucent = UserDefaults.standard.double(forKey: "windowBackgroundOpacity") > 0 && UserDefaults.standard.double(forKey: "windowBackgroundOpacity") < 1
+        let modes = translucent ? ["version", "comment", "settings"] : ["version", "comment", "settings", "settings-centered", "backups", "shortcut", "help", "logoEditor", "welcome", "welcome-hidden", "project", "project-ready", "project-missing"]
+        for mode in modes {
             var panelBounds: NSRect?
             let observer = NotificationCenter.default.addObserver(forName: Notification.Name("PVPanelBounds"), object: nil, queue: .main) { note in
                 panelBounds = (note.object as? NSValue)?.rectValue
@@ -32,11 +34,19 @@ import AppKit
             let host = NSHostingView(rootView: content)
             let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: size.width, height: size.height), styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
+            window.isOpaque = false
+            window.backgroundColor = .clear
             window.appearance = NSAppearance(named: .darkAqua)
             window.contentView = host
             let end = Date().addingTimeInterval(mode == "welcome" ? 2.5 : 0.4)
             while Date() < end { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
             host.layoutSubtreeIfNeeded()
+            if translucent {
+                func effectViews(_ view: NSView) -> [NSVisualEffectView] {
+                    (view as? NSVisualEffectView).map { [$0] } ?? view.subviews.flatMap { effectViews($0) }
+                }
+                guard effectViews(host).contains(where: { $0.blendingMode == .behindWindow }) else { print("FAIL: native frosted backdrop missing"); exit(1) }
+            }
             if ["settings", "help"].contains(mode) {
                 func scrollViews(_ view: NSView) -> [NSScrollView] {
                     (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrollViews($0) }
@@ -81,6 +91,26 @@ import AppKit
             guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { print("FAIL: render unavailable"); exit(1) }
             host.cacheDisplay(in: host.bounds, to: rep)
             try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: (UserDefaults.standard.string(forKey: "pvRenderOutput") ?? "/private/tmp/pv43-render") + "/" + mode + "-" + String(Int(size.width)) + "-" + (UserDefaults.standard.string(forKey: "interfaceLanguage") ?? "en") + ".png"))
+            if mode == "settings-centered" {
+                var panelVisible = false
+                var remainsCentered = false
+                let stateObserver = NotificationCenter.default.addObserver(forName: Notification.Name("PVTestPanelState"), object: nil, queue: .main) { note in
+                    panelVisible = note.userInfo?["visible"] as? Bool ?? false
+                    remainsCentered = note.userInfo?["centered"] as? Bool ?? false
+                }
+                let started = Date()
+                NotificationCenter.default.post(name: Notification.Name("PVTestDismissPanel"), object: nil)
+                for elapsed in [0.03, 0.12, 0.25, 0.46] {
+                    while Date().timeIntervalSince(started) < elapsed { RunLoop.current.run(until: Date().addingTimeInterval(0.002)) }
+                    NotificationCenter.default.post(name: Notification.Name("PVTestInspectPanel"), object: nil)
+                    guard panelVisible == (elapsed < 0.38), remainsCentered else { print("FAIL: panel content/anchor changed before fade ended", elapsed, panelVisible, remainsCentered); exit(1) }
+                    host.layoutSubtreeIfNeeded()
+                    host.cacheDisplay(in: host.bounds, to: rep)
+                    try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: UserDefaults.standard.string(forKey: "pvRenderOutput")! + "/close-" + String(Int(elapsed * 1000)) + "-" + (UserDefaults.standard.string(forKey: "interfaceLanguage") ?? "en") + ".png"))
+                }
+                NotificationCenter.default.removeObserver(stateObserver)
+                print("PASS: actual closing animation retains content and center until fading completes")
+            }
             if mode.hasPrefix("welcome") {
                 var bright = 0
                 for y in 245..<295 {

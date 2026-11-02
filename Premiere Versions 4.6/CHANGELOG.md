@@ -1,3 +1,9 @@
+# 4.6 Build 1
+
+- Adjustable frosted background, with remembered opacity from 15% to 100% and full-strength text and controls.
+- Larger project-navigation target and immediate click access to helper panels.
+- Smoother blur and opacity transitions without a dark overlay.
+
 # 4.5 Build 1
 
 - **Project selection:** a dedicated screen, clearer navigation and reliable handling of missing or moved projects.

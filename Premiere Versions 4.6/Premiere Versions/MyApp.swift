@@ -52,7 +52,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.title = PVL("Premiere Versions — Сохранить версию")
             window.titlebarAppearsTransparent = true
             window.appearance = NSAppearance(named: .darkAqua)
-            window.backgroundColor = NSColor(red: 0.09, green: 0.075, blue: 0.22, alpha: 1)
+            window.isOpaque = false
+            window.backgroundColor = .clear
             window.titleVisibility = .hidden
             window.isMovableByWindowBackground = true
             window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
