@@ -920,8 +920,8 @@
     "en": " · copy errors: %@"
   },
   {
-    "ru": "Горячая клавиша после выхода",
-    "en": "Shortcut after quitting"
+    "ru": "Фоновая активность Premiere Versions Helper",
+    "en": "Premiere Versions Helper background activity"
   },
   {
     "ru": "Разрешить в macOS",
@@ -936,12 +936,12 @@
     "en": "Allow background activity in macOS Settings"
   },
   {
-    "ru": "Сочетание работает и после полного выхода",
-    "en": "The shortcut also works after quitting"
+    "ru": "Помощник активен",
+    "en": "Helper is active"
   },
   {
-    "ru": "Для вызова после выхода нужен фоновый помощник",
-    "en": "A background helper is needed to launch after quitting"
+    "ru": "Помощник отключён",
+    "en": "Helper is off"
   },
   {
     "ru": "Не удалось включить помощник: ",
@@ -964,8 +964,8 @@
     "en": "Optionally, the app reads the adjacent Adobe Premiere Pro Auto-Save folder and keeps one latest matching project copy in a separate subfolder of its archive. Premiere originals are never changed. The previous mirror is removed only after the replacement succeeds. If the folder is missing or inaccessible, regular snapshots continue."
   },
   {
-    "ru": "Отдельный помощник может запускать программу сочетанием после полного выхода. Он работает только при активном Premiere Pro и использует выбранное сочетание. macOS может потребовать разрешить фоновую работу. Помощник не выполняет резервное копирование: для него основная программа должна быть запущена.",
-    "en": "A separate helper can launch the app with your shortcut after quitting. It listens only while Premiere Pro is active and uses your chosen shortcut. macOS may require background activity approval. The helper does not perform backups: those require the main app to be running."
+    "ru": "Отдельный помощник может запускать программу сочетанием после полного закрытия программы. Он работает только при активном Premiere Pro и использует выбранное сочетание. macOS может потребовать разрешить фоновую работу. Помощник не выполняет резервное копирование: для него основная программа должна быть запущена.",
+    "en": "A separate helper can launch the app with your shortcut after quitting the app completely. It listens only while Premiere Pro is active and uses your chosen shortcut. macOS may require background activity approval. The helper does not perform backups: those require the main app to be running."
   },
   {
     "ru": "Отключить Premiere Versions Helper?",
@@ -976,12 +976,12 @@
     "en": "Confirm"
   },
   {
-    "ru": "После выхода из Premiere Versions горячая клавиша перестанет открывать программу. Резервные копии создаются, пока сама программа работает.",
-    "en": "After quitting Premiere Versions, the shortcut will no longer open the app. Backups require the main app to be running."
+    "ru": "После полного закрытия программы горячая клавиша перестанет открывать Premiere Versions. Резервные копии создаются, пока сама программа работает.",
+    "en": "After quitting the app completely, the shortcut will no longer open Premiere Versions. Backups require the main app to be running."
   },
   {
-    "ru": "Premiere Versions Helper открывает программу по горячей клавише из Premiere Pro после полного выхода.",
-    "en": "Premiere Versions Helper opens the app with its shortcut from Premiere Pro, even after quitting."
+    "ru": "Позволяет открыть Premiere Versions горячей клавишей из активного Premiere Pro даже после полного закрытия программы.",
+    "en": "Open Premiere Versions with its shortcut from active Premiere Pro, even after quitting the app completely."
   },
   {
     "ru": "Не удалось изменить работу помощника: ",

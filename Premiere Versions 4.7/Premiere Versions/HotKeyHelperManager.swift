@@ -26,7 +26,7 @@ import ServiceManagement
         guard installed else { enabled = false; needsApproval = false; message = PVL("Помощник доступен после установки в «Программы»"); return }
         enabled = service.status == .enabled
         needsApproval = service.status == .requiresApproval
-        message = PVL(needsApproval ? "Разреши фоновую работу в настройках macOS" : enabled ? "Сочетание работает и после полного выхода" : "Для вызова после выхода нужен фоновый помощник")
+        message = PVL(needsApproval ? "Разреши фоновую работу в настройках macOS" : enabled ? "Помощник активен" : "Помощник отключён")
     }
     func enable(_ value: Bool) async {
         UserDefaults.standard.set(value, forKey: "hotKeyHelperEnabled")

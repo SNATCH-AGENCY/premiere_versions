@@ -1,3 +1,7 @@
+# 4.7 Build 2
+
+- Clarify background helper settings and the confirmation shown when disabling it; simplify repeated status text in both interface languages.
+
 # 4.7 Build 1
 
 - Smarter backup history: ten recent changed states at five-minute intervals, twelve hourly and five daily checkpoints share copies without duplicate content.
