@@ -1,0 +1,44 @@
+{
+  "default": "signature-dark",
+  "variants": [
+    {
+      "id": "pearl",
+      "file": "pv-monochrome-light.png",
+      "asset": "PVPearl"
+    },
+    {
+      "id": "graphite",
+      "file": "pv-monochrome-dark.png",
+      "asset": "PVGraphite"
+    },
+    {
+      "id": "color3",
+      "file": "pv-gradient-primary.png",
+      "asset": "PVColor3"
+    },
+    {
+      "id": "color",
+      "file": "pv-pastel.png",
+      "asset": "PVColor"
+    },
+    {
+      "id": "color2",
+      "file": "pv-gradient-alternate.png",
+      "asset": "PVColor2"
+    },
+    {
+      "id": "signature-dark",
+      "file": "pv-signature-dark.png",
+      "asset": "PVSignatureDark"
+    },
+    {
+      "id": "signature-light",
+      "file": "pv-signature-light.png",
+      "asset": "PVSignatureLight"
+    }
+  ],
+  "custom": [
+    "usercolor.png",
+    "userprevcolor.png"
+  ]
+}

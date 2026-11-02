@@ -1,0 +1,878 @@
+[
+  {
+    "ru": "Найдено: %@ · скопировано: %@ · уже в архиве: %@ · ожидают стабильности: %@ · нет доступа к папкам: %@",
+    "en": "Found: %@ · copied: %@ · already archived: %@ · waiting for stability: %@ · inaccessible folders: %@"
+  },
+  {
+    "ru": "Нужен доступ к прежней папке пользовательского значка. Выбор сохранён.",
+    "en": "Access to the previous custom icon folder is needed. Your selection is saved."
+  },
+  {
+    "ru": "Восстановить пользовательские значки",
+    "en": "Restore custom icons"
+  },
+  {
+    "ru": "Выбери прежнюю папку с usercolor.png. Значки будут скопированы в данные приложения; оригиналы останутся на месте.",
+    "en": "Choose the previous folder containing usercolor.png. Icons will be copied into app data; originals will remain unchanged."
+  },
+  {
+    "ru": "В папке не найден usercolor.png",
+    "en": "No usercolor.png found in this folder"
+  },
+  {
+    "ru": "Не удалось восстановить значки: ",
+    "en": "Could not restore icons: "
+  },
+  {
+    "ru": "Обновления ещё не проверялись",
+    "en": "Updates have not been checked yet"
+  },
+  {
+    "ru": "Проверка обновлений…",
+    "en": "Checking for updates…"
+  },
+  {
+    "ru": "Источник обновлений ещё не опубликован",
+    "en": "The update feed has not been published yet"
+  },
+  {
+    "ru": "Установлена актуальная версия",
+    "en": "You are up to date"
+  },
+  {
+    "ru": "Доступно обновление",
+    "en": "An update is available"
+  },
+  {
+    "ru": "Не удалось проверить обновления: %@",
+    "en": "Could not check for updates: %@"
+  },
+  {
+    "ru": "Обновления",
+    "en": "Updates"
+  },
+  {
+    "ru": "Дата сборки: ",
+    "en": "Build date: "
+  },
+  {
+    "ru": "Проверить обновления",
+    "en": "Check for updates"
+  },
+  {
+    "ru": "Последняя проверка: ",
+    "en": "Last checked: "
+  },
+  {
+    "ru": "Установить и перезапустить",
+    "en": "Install and restart"
+  },
+  {
+    "ru": "Открыть страницу загрузки",
+    "en": "Open download page"
+  },
+  {
+    "ru": "Номер сохраняемой версии",
+    "en": "Version to save"
+  },
+  {
+    "ru": "Показать окно сохранения",
+    "en": "Show save window"
+  },
+  {
+    "ru": "Premiere Versions — Сохранить версию",
+    "en": "Premiere Versions — Save a version"
+  },
+  {
+    "ru": "Подключение сочетания…",
+    "en": "Connecting shortcut…"
+  },
+  {
+    "ru": "Не удалось подключить обработчик сочетания",
+    "en": "Could not connect the shortcut handler"
+  },
+  {
+    "ru": " — открыть окно сохранения",
+    "en": " — open save window"
+  },
+  {
+    "ru": " недоступно: сочетание может быть занято",
+    "en": " unavailable: the shortcut may be in use"
+  },
+  {
+    "ru": "Добавь Command, Option или Control к выбранной клавише.",
+    "en": "Add Command, Option or Control to the selected key."
+  },
+  {
+    "ru": "Не удалось подключить сочетание. Попробуй ещё раз.",
+    "en": "Could not register the shortcut. Please try again."
+  },
+  {
+    "ru": "Это сочетание занято или недоступно. Выбери другое.",
+    "en": "This shortcut is in use or unavailable. Choose another."
+  },
+  {
+    "ru": "Мониторинг не настроен",
+    "en": "Monitoring is not configured"
+  },
+  {
+    "ru": "Разреши доступ для поиска и сохранения копий",
+    "en": "Allow access to find projects and save backups"
+  },
+  {
+    "ru": "Мониторинг включён · проверка каждые %@ секунд",
+    "en": "Monitoring enabled · checking every %@ seconds"
+  },
+  {
+    "ru": "Мониторинг выключен",
+    "en": "Monitoring disabled"
+  },
+  {
+    "ru": "Сначала разреши доступ для поиска и сохранения копий",
+    "en": "First allow access to find projects and save backups"
+  },
+  {
+    "ru": "Настройки поиска изменены",
+    "en": "Search settings changed"
+  },
+  {
+    "ru": "Разрешить поиск проектов",
+    "en": "Allow project search"
+  },
+  {
+    "ru": "Выбери системный диск Macintosh HD для поиска проектов на компьютере и подключённых дисках. macOS может отдельно запросить доступ к защищённым папкам и внешним дискам.",
+    "en": "Choose the Macintosh HD system disk to find projects on this Mac and connected drives. macOS may separately request access to protected folders and external drives."
+  },
+  {
+    "ru": "Разрешить доступ",
+    "en": "Allow access"
+  },
+  {
+    "ru": "Для общего поиска выбери системный диск. Для одной папки используй режим «Выбранная папка».",
+    "en": "For a full search, choose the system disk. To search one folder, use the selected-folder mode."
+  },
+  {
+    "ru": "Доступ сохранён. Можно включить резервное копирование.",
+    "en": "Access saved. Backups can now be enabled."
+  },
+  {
+    "ru": "Не удалось настроить доступ: %@. Папку сохранения можно выбрать в дополнительных настройках.",
+    "en": "Could not configure access: %@. You can choose a destination in Settings."
+  },
+  {
+    "ru": "Разрешить сохранение резервных копий",
+    "en": "Allow backup saving"
+  },
+  {
+    "ru": "Для папок по умолчанию выбери Рабочий стол своего пользователя. Программа создаст Premiere_Versions с разделами Premiere_Saves и Premiere_AutoSaves. Другие места можно выбрать в дополнительных настройках.",
+    "en": "For default folders, choose your Desktop. The app will create Premiere_Versions with Premiere_Saves and Premiere_AutoSaves inside. Other locations can be selected in Settings."
+  },
+  {
+    "ru": "Разрешить сохранение",
+    "en": "Allow saving"
+  },
+  {
+    "ru": "Выбранная папка не содержит место сохранения. Выбери Рабочий стол или измени расположение архива в настройках.",
+    "en": "The selected folder does not contain the destination. Choose Desktop or change the archive location in Settings."
+  },
+  {
+    "ru": "Не удалось настроить сохранение: %@",
+    "en": "Could not configure saving: %@"
+  },
+  {
+    "ru": "Не удалось включить отслеживание изменений. Проверь доступ к диску.",
+    "en": "Could not watch for file changes. Check disk access."
+  },
+  {
+    "ru": "Проверяю проекты и автосейвы…",
+    "en": "Checking projects and backups…"
+  },
+  {
+    "ru": "Найдено: %@ · скопировано: %@ · уже в архиве: %@ · ожидают стабильности: %@",
+    "en": "Found: %@ · copied: %@ · already archived: %@ · waiting for stability: %@"
+  },
+  {
+    "ru": " · нет доступа к папкам: %@",
+    "en": " · inaccessible folders: %@"
+  },
+  {
+    "ru": "Ошибка мониторинга: %@",
+    "en": "Monitoring error: %@"
+  },
+  {
+    "ru": "\nОтслеживание новых файлов недоступно. Используй «Проверить сейчас» или выдай доступ заново.",
+    "en": "\nNew-file monitoring is unavailable. Use Check now or grant access again."
+  },
+  {
+    "ru": "Нет доступа к папке поиска: %@",
+    "en": "No access to the search folder: %@"
+  },
+  {
+    "ru": "Папка наблюдения не должна совпадать с архивом или находиться внутри него.",
+    "en": "The watched folder cannot be the archive or be inside it."
+  },
+  {
+    "ru": "Совпадают имена резервных копий: ",
+    "en": "Backup filenames conflict: "
+  },
+  {
+    "ru": ". Обе копии сохранены.",
+    "en": ". Both copies have been preserved."
+  },
+  {
+    "ru": "Сохранённый доступ отсутствует. Выбери папку или проект заново.",
+    "en": "Saved access is missing. Select the folder or project again."
+  },
+  {
+    "ru": "Установи программу в Applications, чтобы значок сохранялся после закрытия.",
+    "en": "Install the app in Applications to keep its icon after quitting."
+  },
+  {
+    "ru": "Разреши сохранять выбранный значок после закрытия программы.",
+    "en": "Allow the selected icon to persist after quitting."
+  },
+  {
+    "ru": "Разрешить сохранение значка",
+    "en": "Allow icon saving"
+  },
+  {
+    "ru": "Нажми «Разрешить», чтобы значок сохранялся после закрытия программы. Нужная папка уже открыта.",
+    "en": "Click Allow to keep the icon after quitting. The required folder is already open."
+  },
+  {
+    "ru": "Разрешить",
+    "en": "Allow"
+  },
+  {
+    "ru": "Разреши доступ к папке установленной программы в Applications.",
+    "en": "Allow access to the installed app folder in Applications."
+  },
+  {
+    "ru": "Не удалось сохранить доступ для значка: ",
+    "en": "Could not save icon access: "
+  },
+  {
+    "ru": "Разреши сохранять значок после закрытия программы.",
+    "en": "Allow the icon to persist after quitting."
+  },
+  {
+    "ru": "Не удалось прочитать шаблон логотипа.",
+    "en": "Could not read the logo template."
+  },
+  {
+    "ru": "Выбран некорректный цвет.",
+    "en": "The selected color is invalid."
+  },
+  {
+    "ru": "Не удалось сохранить изображение: некорректный PNG.",
+    "en": "Could not save the image: invalid PNG."
+  },
+  {
+    "ru": "Не удалось создать изображение логотипа.",
+    "en": "Could not render the logo image."
+  },
+  {
+    "ru": "Свой цвет",
+    "en": "Custom color"
+  },
+  {
+    "ru": "Закрыть конструктор",
+    "en": "Close color editor"
+  },
+  {
+    "ru": "Плашка",
+    "en": "Tile"
+  },
+  {
+    "ru": "Буквы",
+    "en": "Letters"
+  },
+  {
+    "ru": "Новый вариант появится в списке значков Dock. Предыдущий пользовательский цвет останется рядом.",
+    "en": "The new variant will appear in the Dock icon list. Your previous custom color will stay beside it."
+  },
+  {
+    "ru": "Изменится только этот значок. Другой пользовательский вариант останется без изменений.",
+    "en": "Only this icon will change. Your other custom variant will stay unchanged."
+  },
+  {
+    "ru": "Отмена",
+    "en": "Cancel"
+  },
+  {
+    "ru": "Сохранение…",
+    "en": "Saving…"
+  },
+  {
+    "ru": "Сохранить цвет",
+    "en": "Save color"
+  },
+  {
+    "ru": "Шаблон логотипа не найден.",
+    "en": "Logo template not found."
+  },
+  {
+    "ru": "Выбери проект Premiere",
+    "en": "Choose a Premiere project"
+  },
+  {
+    "ru": "Настройки",
+    "en": "Settings"
+  },
+  {
+    "ru": "Резервное копирование",
+    "en": "Backups"
+  },
+  {
+    "ru": "Значок Dock",
+    "en": "Dock icon"
+  },
+  {
+    "ru": "На главный экран",
+    "en": "Back to version"
+  },
+  {
+    "ru": "Информация о программе",
+    "en": "About the app"
+  },
+  {
+    "ru": "Информация: ",
+    "en": "About: "
+  },
+  {
+    "ru": "Выбрать проект",
+    "en": "Choose a project"
+  },
+  {
+    "ru": "Выбрать проект Premiere Pro",
+    "en": "Choose a Premiere Pro project"
+  },
+  {
+    "ru": "Текущий проект: ",
+    "en": "Current project: "
+  },
+  {
+    "ru": "не выбран",
+    "en": "not selected"
+  },
+  {
+    "ru": ". Изменить проект",
+    "en": ". Change project"
+  },
+  {
+    "ru": "Прокрутить вверх к версии",
+    "en": "Scroll up to version"
+  },
+  {
+    "ru": "Прокрутить вниз к комментарию",
+    "en": "Scroll down to comment"
+  },
+  {
+    "ru": "Прошлая версия: ",
+    "en": "Previous version: "
+  },
+  {
+    "ru": "Следующая версия",
+    "en": "Next version"
+  },
+  {
+    "ru": "Комментарий к версии, необязательно",
+    "en": "Version comment, optional"
+  },
+  {
+    "ru": "Номер версии должен быть в формате v008",
+    "en": "The version number must use the v008 format"
+  },
+  {
+    "ru": "Проверка…",
+    "en": "Checking…"
+  },
+  {
+    "ru": "Выключен",
+    "en": "Disabled"
+  },
+  {
+    "ru": "Нужен доступ",
+    "en": "Access needed"
+  },
+  {
+    "ru": "ошибка",
+    "en": "error"
+  },
+  {
+    "ru": "Ошибка проверки",
+    "en": "Check failed"
+  },
+  {
+    "ru": "Мониторинг включён",
+    "en": "Monitoring enabled"
+  },
+  {
+    "ru": "Резервные копии",
+    "en": "Backups"
+  },
+  {
+    "ru": "Показать подробности резервного копирования",
+    "en": "Show backup details"
+  },
+  {
+    "ru": "Выбрать папку…",
+    "en": "Choose folder…"
+  },
+  {
+    "ru": "Разрешить поиск…",
+    "en": "Allow search…"
+  },
+  {
+    "ru": "Разрешить сохранение…",
+    "en": "Allow saving…"
+  },
+  {
+    "ru": "Проверить сейчас",
+    "en": "Check now"
+  },
+  {
+    "ru": "Открыть архив автосейвов",
+    "en": "Open backup archive"
+  },
+  {
+    "ru": "Не удалось открыть архив",
+    "en": "Could not open the archive"
+  },
+  {
+    "ru": "Сначала разреши доступ к папке архива",
+    "en": "First allow access to the archive folder"
+  },
+  {
+    "ru": "Language / Язык",
+    "en": "Language / Язык"
+  },
+  {
+    "ru": "Русский",
+    "en": "Русский"
+  },
+  {
+    "ru": "Расположение папок",
+    "en": "Folder locations"
+  },
+  {
+    "ru": "Где искать проекты",
+    "en": "Where to find projects"
+  },
+  {
+    "ru": "Компьютер и подключённые диски",
+    "en": "This Mac and connected drives"
+  },
+  {
+    "ru": "Только выбранная папка",
+    "en": "Selected folder only"
+  },
+  {
+    "ru": "Папка поиска",
+    "en": "Search folder"
+  },
+  {
+    "ru": "Не выбрана",
+    "en": "Not selected"
+  },
+  {
+    "ru": "Изменить…",
+    "en": "Change…"
+  },
+  {
+    "ru": "Куда сохранять версии",
+    "en": "Where to save versions"
+  },
+  {
+    "ru": "Куда сохранять автосейвы",
+    "en": "Where to save backups"
+  },
+  {
+    "ru": "Восстановить прежний значок…",
+    "en": "Restore previous icon…"
+  },
+  {
+    "ru": "Пользовательский цвет",
+    "en": "Custom color"
+  },
+  {
+    "ru": "Предыдущий пользовательский цвет",
+    "en": "Previous custom color"
+  },
+  {
+    "ru": "Логотип",
+    "en": "Logo"
+  },
+  {
+    "ru": "Значок Dock: ",
+    "en": "Dock icon: "
+  },
+  {
+    "ru": "Создать свой цвет",
+    "en": "Create a custom color"
+  },
+  {
+    "ru": "Открыть конструктор цвета логотипа",
+    "en": "Open logo color editor"
+  },
+  {
+    "ru": "недоступно",
+    "en": "unavailable"
+  },
+  {
+    "ru": "не удалось",
+    "en": "could not"
+  },
+  {
+    "ru": "Резервирование выключено",
+    "en": "Backups disabled"
+  },
+  {
+    "ru": "Разрешить резервирование",
+    "en": "Allow backups"
+  },
+  {
+    "ru": "Резервирование включено",
+    "en": "Backups enabled"
+  },
+  {
+    "ru": "\nНаведи, чтобы открыть резервное копирование",
+    "en": "\nHover to open backups"
+  },
+  {
+    "ru": "Изменить сочетание клавиш",
+    "en": "Change keyboard shortcut"
+  },
+  {
+    "ru": "Недоступна",
+    "en": "Unavailable"
+  },
+  {
+    "ru": "Сохранённый проект не найден.",
+    "en": "Saved project not found."
+  },
+  {
+    "ru": "Последний проект восстановлен",
+    "en": "Last project restored"
+  },
+  {
+    "ru": "Выбрать проект Premiere",
+    "en": "Choose a Premiere project"
+  },
+  {
+    "ru": "Выбери файл .prproj",
+    "en": "Choose a .prproj file"
+  },
+  {
+    "ru": "Проект выбран и сохранён для следующего запуска",
+    "en": "Project selected and saved for next launch"
+  },
+  {
+    "ru": "Не удалось сохранить доступ к проекту: %@",
+    "en": "Could not save project access: %@"
+  },
+  {
+    "ru": "Выбрать папку архива",
+    "en": "Choose archive folder"
+  },
+  {
+    "ru": "Выбери корневую папку Premiere_Versions",
+    "en": "Choose the Premiere_Versions root folder"
+  },
+  {
+    "ru": "Папка архива и доступ сохранены",
+    "en": "Archive folder and access saved"
+  },
+  {
+    "ru": "Не удалось сохранить доступ к архиву: %@",
+    "en": "Could not save archive access: %@"
+  },
+  {
+    "ru": "Папка проекта по умолчанию",
+    "en": "Default project folder"
+  },
+  {
+    "ru": "Эта папка будет открываться при выборе проекта",
+    "en": "This folder will open when choosing a project"
+  },
+  {
+    "ru": "Папка по умолчанию сохранена",
+    "en": "Default folder saved"
+  },
+  {
+    "ru": "Не удалось сохранить папку: %@",
+    "en": "Could not save the folder: %@"
+  },
+  {
+    "ru": "Папка наблюдения",
+    "en": "Watched folder"
+  },
+  {
+    "ru": "Выбери папку, внутри которой Premiere хранит проекты и Adobe Premiere Pro Auto-Save",
+    "en": "Choose the folder containing your Premiere projects and Adobe Premiere Pro Auto-Save"
+  },
+  {
+    "ru": "Папка наблюдения выбрана",
+    "en": "Watched folder selected"
+  },
+  {
+    "ru": "Архив автосейвов",
+    "en": "Backup archive"
+  },
+  {
+    "ru": "Выбери папку, куда копировать резервные автосейвы",
+    "en": "Choose where to copy project backups"
+  },
+  {
+    "ru": "Папка архива автосейвов выбрана",
+    "en": "Backup archive folder selected"
+  },
+  {
+    "ru": "Не удалось сохранить доступ: %@",
+    "en": "Could not save access: %@"
+  },
+  {
+    "ru": "Нет доступа",
+    "en": "No access"
+  },
+  {
+    "ru": "Ещё нет",
+    "en": "None yet"
+  },
+  {
+    "ru": "Сначала выбери проект .prproj",
+    "en": "First choose a .prproj project"
+  },
+  {
+    "ru": "Файл с таким именем уже существует.",
+    "en": "A file with this name already exists."
+  },
+  {
+    "ru": "Версия %@ сохранена",
+    "en": "Version %@ saved"
+  },
+  {
+    "ru": "Ошибка сохранения: %@",
+    "en": "Save error: %@"
+  },
+  {
+    "ru": "Сочетание клавиш",
+    "en": "Keyboard shortcut"
+  },
+  {
+    "ru": "Сейчас: ",
+    "en": "Current: "
+  },
+  {
+    "ru": "Нажми новое сочетание",
+    "en": "Press a new shortcut"
+  },
+  {
+    "ru": "Нажми, чтобы записать сочетание",
+    "en": "Click to record a shortcut"
+  },
+  {
+    "ru": "Начать запись нового сочетания",
+    "en": "Start recording a new shortcut"
+  },
+  {
+    "ru": "Добавь Command, Option или Control. Esc — отменить. Сочетание будет работать во всех приложениях.",
+    "en": "Include Command, Option or Control. Esc cancels. The shortcut works in all apps."
+  },
+  {
+    "ru": "Вернуть Option+S",
+    "en": "Reset to Option+S"
+  },
+  {
+    "ru": "Нажмите новое сочетание клавиш. Escape — отменить.",
+    "en": "Press a new keyboard shortcut. Escape cancels."
+  },
+  {
+    "ru": "Совместно с Codex",
+    "en": "Together with Codex"
+  },
+  {
+    "ru": "Чёрный на белом",
+    "en": "Black on white"
+  },
+  {
+    "ru": "Белый на чёрном",
+    "en": "White on black"
+  },
+  {
+    "ru": "Развернуть",
+    "en": "Expand"
+  },
+  {
+    "ru": "Свернуть",
+    "en": "Collapse"
+  },
+  {
+    "ru": "Посмотреть приветствие",
+    "en": "Watch the welcome"
+  },
+  {
+    "ru": "Версия ",
+    "en": "Version "
+  },
+  {
+    "ru": "Первый запуск",
+    "en": "First launch"
+  },
+  {
+    "ru": "Обычный запуск и клик по Dock открывают окно поверх других окон. После установки или обновления появляется приветствие. Сочетание работает только когда Premiere Pro — активное приложение. Enter или прокрутка вниз открывают главный экран. Панели открываются только наведением и закрываются при уходе мыши. Настройки из Check updates и редактор логотипа открываются в центре окна. В настройках можно включить монохромный значок строки меню: нажатие открывает программу, правое нажатие — меню выхода. Esc закрывает панель, возвращает к версии или скрывает главное окно в фон.",
+    "en": "Launching the app or clicking its Dock icon brings the window to the front. After installation or an update, the welcome appears. The shortcut works only while Premiere Pro is the frontmost app. Return or scroll down opens the main screen. Panels open on hover and close when the pointer leaves. Settings from Check updates and the logo editor open in the center of the window. Settings can enable a monochrome menu bar icon: click to open the app, right-click for the quit menu. Esc closes a panel, returns to version or hides the main window."
+  },
+  {
+    "ru": "Сохранение",
+    "en": "Saving"
+  },
+  {
+    "ru": "Версия → Enter → комментарий → Enter. Прокрутка вниз открывает комментарий, вверх возвращает к версии. Возврат также — ← version или Esc. Комментарий необязателен. Копируется файл на диске: сначала сохрани изменения в Premiere. Ручные версии автоматически не удаляются. Кнопки press return работают и мышью.",
+    "en": "Version → Return → comment → Return. Scroll down for a comment, up to return to version. You can also use ← version or Esc. Comments are optional. The on-disk file is copied: save your edits in Premiere first. Manual versions are never automatically deleted. The press return hints are clickable too."
+  },
+  {
+    "ru": "Проверка раз в %@ с; файл должен быть стабилен %@ с. Файлы и папки с autosave / auto-save / auto save, готовые автосейвы Premiere и наши архивы пропускаются. Имя содержит статус recent/hourly/daily, местную дату изменения проекта и окончание autosave.",
+    "en": "Checked every %@ s; files must be stable for %@ s. Files and folders named autosave / auto-save / auto save, existing Premiere autosaves and our archives are skipped. Filenames include recent/hourly/daily status, local project modification time and the autosave suffix."
+  },
+  {
+    "ru": "Хранение",
+    "en": "Retention"
+  },
+  {
+    "ru": "recent — %@ последних; hourly — почасовые за %@ часов; daily — дневные за %@ дней. После новой копии обновляются статусы и удаляются лишние файлы только в резервном архиве.",
+    "en": "recent — last %@ copies; hourly — one per hour for %@ hours; daily — one per day for %@ days. After a new copy, statuses are updated and excess files are removed only from the backup archive."
+  },
+  {
+    "ru": "Доступ и фон",
+    "en": "Access and background"
+  },
+  {
+    "ru": "Поиск — на разрешённых дисках или в выбранной папке. Статус внизу открывает только резервное копирование; шестерёнка — настройки: папки, значки, затем тот же блок копирования. Изменения синхронизированы. Закрытие — Esc или нажатие снаружи. Программа работает до полного выхода; автозапуска пока нет.",
+    "en": "Search covers allowed drives or a selected folder. The footer opens backups only; the gear opens Settings: folders, icons, then the same backup controls. Changes stay synchronized. Esc or an outside click closes the panel. The app runs until you quit; launch at login is not available yet."
+  },
+  {
+    "ru": "Клавиши и логотип",
+    "en": "Shortcuts and logo"
+  },
+  {
+    "ru": "Сейчас: %@. Сочетание работает в активном Premiere Pro. При записи используется английская раскладка, прежняя возвращается после завершения. Наведение открывает настройки; запись начинается отдельным нажатием. Встроенные логотипы находятся в приложении. Выбор Dock и два пользовательских варианта сохраняются между версиями. Выбранный значок сохраняется и для закрытого приложения после разрешения доступа к папке программы. При обновлении он применяется к запущенной новой версии, старые архивные приложения не меняются.",
+    "en": "Current: %@. The shortcut works in active Premiere Pro. Recording uses the English input source and restores the previous source afterwards. Hover over the shortcut to open its settings; recording starts with a separate click. Built-in logos are inside the app. Your Dock selection and two custom variants survive updates. The selected icon persists after quitting once app-folder access is allowed. Updates apply it to the new running app; archived apps are not changed."
+  },
+  {
+    "ru": "Публичных выпусков пока нет",
+    "en": "No public releases yet"
+  },
+  {
+    "ru": "Нет выпусков для этой версии macOS",
+    "en": "No releases are compatible with this macOS version"
+  },
+  {
+    "ru": "Выбрать цвет с экрана",
+    "en": "Pick a color from the screen"
+  },
+  {
+    "ru": "Цветовой круг",
+    "en": "Color wheel"
+  },
+  {
+    "ru": "Яркость",
+    "en": "Brightness"
+  },
+  {
+    "ru": " — доступно в активном Premiere Pro",
+    "en": " — available in active Premiere Pro"
+  },
+  {
+    "ru": "Открыть из Premiere Pro — когда его окно активно.",
+    "en": "Open from Premiere Pro — while its window is active."
+  },
+  {
+    "ru": "Показывать значок в строке меню",
+    "en": "Show icon in menu bar"
+  },
+  {
+    "ru": "Открыть Premiere Versions",
+    "en": "Open Premiere Versions"
+  },
+  {
+    "ru": "Завершить Premiere Versions",
+    "en": "Quit Premiere Versions"
+  },
+  {
+    "ru": "Выбери проект",
+    "en": "Choose a project"
+  },
+  {
+    "ru": "Проект недоступен",
+    "en": "Project unavailable"
+  },
+  {
+    "ru": "файл .prproj",
+    "en": ".prproj file"
+  },
+  {
+    "ru": "Выбрать файл",
+    "en": "Choose file"
+  },
+  {
+    "ru": "Другой проект",
+    "en": "Another project"
+  },
+  {
+    "ru": "Показывать в Dock",
+    "en": "Show in Dock"
+  },
+  {
+    "ru": "Индиго",
+    "en": "Indigo"
+  },
+  {
+    "ru": "Лаванда",
+    "en": "Lavender"
+  },
+  {
+    "ru": "Создать свой значок",
+    "en": "Create custom icon"
+  },
+  {
+    "ru": "Удалить пользовательский значок",
+    "en": "Delete custom icon"
+  },
+  {
+    "ru": "для открытия из Premiere Pro",
+    "en": "to open from Premiere Pro"
+  },
+  {
+    "ru": "Сейчас используется: ",
+    "en": "Currently using: "
+  },
+  {
+    "ru": "Добавь Command, Option или Control. Esc — отменить. Сочетание работает только в активном Premiere Pro.",
+    "en": "Use Command, Option or Control. Esc to cancel. The shortcut works only in active Premiere Pro."
+  },
+  {
+    "ru": "Выбор проекта",
+    "en": "Project selection"
+  },
+  {
+    "ru": "Настройки и обновления",
+    "en": "Settings and updates"
+  },
+  {
+    "ru": "Если проект не выбран или недоступен, выбери файл на отдельном экране. После выбора Enter или прокрутка вниз открывают версию. Название проекта со стрелкой вверх возвращает к выбору; прокрутка вверх с версии туда не ведёт. Удалённый проект больше не считается активным.",
+    "en": "If a project is missing or not selected, choose its file on the project screen. Return or scroll down continues to the version. Click the project name with the up arrow to go back; scrolling up from the version does not return there. Removed files are no longer treated as active projects."
+  },
+  {
+    "ru": "Прокрутка настроек сохраняется на 10 секунд после закрытия. Значок Dock можно скрыть, сохранив доступ через строку меню. Проверки обновлений идут в фоне при запуске и раз в 6 часов; коралловая точка сообщает о новой версии. Установка остаётся ручной.",
+    "en": "Settings remembers its scroll position for 10 seconds after closing. Hide the Dock icon while keeping access through the menu bar. Updates are checked quietly at launch and every 6 hours; a coral dot indicates a new release. Installation remains manual."
+  },
+  {
+    "ru": "Изменить сочетание",
+    "en": "Change shortcut"
+  },
+  {
+    "ru": "Esc — отменить.",
+    "en": "Esc to cancel."
+  }
+]

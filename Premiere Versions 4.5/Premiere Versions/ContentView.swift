@@ -1,0 +1,1645 @@
+import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
+import Carbon
+
+struct ContentView: View {
+    @AppStorage("showInDock") private var showInDock = true
+    @AppStorage("menuBarIconEnabled") private var menuBarIconEnabled = false
+    @AppStorage("archivePath")
+    private var archivePath = DefaultLocations.versions
+
+    @AppStorage("defaultProjectFolder")
+    private var defaultProjectFolder = ""
+
+    @AppStorage("lastProjectFolder")
+    private var lastProjectFolder = ""
+
+    @State private var sourceProjectURL: URL?
+    @State private var projectName = ""
+    @State private var versionNumber = "v001"
+    @State private var versionComment = ""
+    @State private var statusMessage = PVL("Выбери проект Premiere")
+    @State private var isError = false
+    @State private var didRestore = false
+    private enum Panel: Equatable { case settings, backups, shortcut, help, logoEditor }
+    @State private var activePanel: Panel?
+    @State private var panelPinned = false
+    @State private var panelCentered = false
+    @State private var panelHovered = false
+    @State private var panelAnchor = CGPoint(x: 360, y: 270)
+    @State private var panelCloseTask: Task<Void, Never>?
+    @State private var headerHovered = false
+    @State private var visibleWindow = false
+    @State private var welcomeID = UUID()
+    @State private var editedLogoSlot: String?
+    @State private var updateScrollRequest = 0
+    @StateObject private var updates = PVUpdateService.shared
+    @AppStorage("interfaceLanguage") private var interfaceLanguage = "en"
+    @State private var hoverIntent: Panel?
+    @State private var hoverTask: Task<Void, Never>?
+    private var showingSettings: Bool {
+        get { activePanel == .settings }
+        nonmutating set { if newValue { openPanel(.settings) } else if activePanel == .settings { activePanel = nil } }
+    }
+    private var showingShortcutEditor: Bool {
+        get { activePanel == .shortcut }
+        nonmutating set { if newValue { openPanel(.shortcut) } else if activePanel == .shortcut { activePanel = nil } }
+    }
+    private var showingHelp: Bool {
+        get { activePanel == .help }
+        nonmutating set { if newValue { openPanel(.help) } else if activePanel == .help { activePanel = nil } }
+    }
+    private var showingLogoEditor: Bool {
+        get { activePanel == .logoEditor }
+        nonmutating set { if newValue { openPanel(.logoEditor) } else if activePanel == .logoEditor { activePanel = nil } }
+    }
+    @State private var showingWelcome = PVWelcomePolicy.needsPresentation()
+    @State private var welcomeTransitioning = false
+    @State private var welcomeTask: Task<Void, Never>?
+    @State private var footerHeight: CGFloat = 50
+    @State private var versionFocusRequest = 0
+    @StateObject private var userLogos = PVUserLogoLibrary.shared
+    @StateObject private var fileIcons = PVFileIconStore.shared
+    @State private var visualsActive = false
+    @State private var commentStage = false
+    @State private var selectingProject = true
+    @State private var missingProjectName = ""
+    @StateObject private var projectWatcher = PVProjectWatcher()
+    @StateObject private var settingsScroll = PVScrollMemory()
+    @State private var stageFocusTask: Task<Void, Never>?
+    @AppStorage("logoVariant") private var logoVariant = "signature-dark"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    // Autosave monitor settings. The user grants access to the watched folder
+    // and archive destination through NSOpenPanel; bookmarks persist that access.
+    @AppStorage("autosaveWatchPath")
+    private var autosaveWatchPath = ""
+
+    @AppStorage("autosaveArchivePath")
+    private var autosaveArchivePath = DefaultLocations.autosaves
+
+    @AppStorage("autosaveMonitoringEnabled")
+    private var autosaveMonitoringEnabled = false
+
+    @AppStorage("searchMode") private var searchMode = "all"
+
+    @EnvironmentObject private var autosaveMonitor: AutosaveMonitor
+    @EnvironmentObject private var hotKey: GlobalSaveHotKey
+
+    private enum InputFocus: Hashable {
+        case version
+        case comment
+    }
+
+    @State private var focusedField: InputFocus?
+    @FocusState private var commentHasFocus: Bool
+
+    private let fileManager = FileManager.default
+    @Environment(\.colorScheme) private var colorScheme
+    private var theme: PVTheme { PVTheme(dark: true) }
+    private var blue: Color { theme.accent }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                PVAnimatedBackdrop(active: visualsActive && visibleWindow)
+                    .blur(radius: activePanel == nil ? 0 : 3)
+                if showingWelcome {
+                    welcomePage
+                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: -60)))
+                } else {
+                    ZStack {
+                    VStack(spacing: 0) {
+                        Color.clear.frame(height: 84)
+                        projectCard.opacity(selectingProject ? 0 : 1).allowsHitTesting(!selectingProject)
+                        stagedComposer
+                        Color.clear.frame(height: footerHeight)
+                    }
+                    .blur(radius: activePanel == nil ? 0 : 3)
+                    .opacity(activePanel == nil ? 1 : 0.55)
+                    .allowsHitTesting(activePanel == nil && !welcomeTransitioning)
+                    VStack(spacing: 0) {
+                        header.padding(.top, 28)
+                        Spacer(minLength: 0)
+                        footer.background {
+                            GeometryReader { proxy in
+                                Color.clear.preference(key: PVFooterHeight.self, value: proxy.size.height)
+                            }
+                        }
+                    }
+                    .blur(radius: activePanel == nil ? 0 : 3)
+                    .opacity(activePanel == nil ? 1 : 0.5)
+                    .allowsHitTesting(activePanel == nil && !welcomeTransitioning)
+                    if let activePanel {
+                        Color.black.opacity(0.24).contentShape(Rectangle())
+                            .onTapGesture { dismissPanel() }
+                        panelBody(maxHeight: max(260, geometry.size.height - 32))
+                            .contentShape(RoundedRectangle(cornerRadius: 18))
+                            .onHover { inside in
+                                panelHovered = inside
+                                panelCloseTask?.cancel()
+                                if !inside && !panelPinned { schedulePanelClose(activePanel) }
+                            }
+                            .position(panelPosition(in: geometry.size))
+                            .transition(.modifier(active: PVPanelFade(amount: 1), identity: PVPanelFade(amount: 0)))
+                            .transition(.opacity)
+                    }
+                    }
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 80)))
+                }
+            }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.38), value: activePanel)
+            .onPreferenceChange(PVFooterHeight.self) { footerHeight = $0 }
+        }
+        .ignoresSafeArea()
+        .foregroundStyle(theme.ink)
+        .tint(theme.accent)
+        .preferredColorScheme(.dark)
+        .background { PVEscapeCapture(action: handleEscape) }
+        .background { PVWindowVisibility(visible: $visibleWindow) }
+        .environment(\.locale, Locale(identifier: interfaceLanguage == "ru" ? "ru" : "en"))
+        .onChange(of: logoVariant) { _, _ in PVBrand.applySelectedIcon(allowIconAccessPrompt: true) }
+        .onChange(of: userLogos.revision) { _, _ in PVBrand.applySelectedIcon(allowIconAccessPrompt: true) }
+        .onChange(of: focusedField) { _, target in
+            if target == .comment { commentHasFocus = true }
+            else if target == .version { commentHasFocus = false }
+        }
+        .onChange(of: commentHasFocus) { _, focused in
+            if focused { focusedField = .comment }
+            else if focusedField == .comment { focusedField = nil }
+        }
+        .onChange(of: activePanel) { _, panel in
+            if panel != nil { clearTextFocus() }
+            else if panel == nil { restoreComposerFocus() }
+        }
+        .onDisappear { hoverTask?.cancel(); stageFocusTask?.cancel(); welcomeTask?.cancel(); panelCloseTask?.cancel() }
+        .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
+            if activePanel != nil { panelPinned = true; panelCloseTask?.cancel() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSMenu.didEndTrackingNotification)) { _ in
+            panelPinned = panelCentered
+            if !panelPinned && !panelHovered, let panel = activePanel { schedulePanelClose(panel) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didHideNotification)) { _ in visualsActive = false; stageFocusTask?.cancel(); hoverTask?.cancel(); hoverIntent = nil }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { note in
+            if let window = note.object as? NSWindow, window.title.hasPrefix("Premiere Versions") { visualsActive = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            if let window = note.object as? NSWindow, window.title.hasPrefix("Premiere Versions") { visualsActive = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
+            if let window = note.object as? NSWindow, window.title.hasPrefix("Premiere Versions") {
+                visualsActive = false
+                if welcomeTransitioning {
+                    welcomeTask?.cancel()
+                    welcomeTransitioning = false
+                    openPanel(.settings)
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showVersionSaveWindow)) { _ in
+            visualsActive = true
+            guard !showingWelcome, !welcomeTransitioning, !showingShortcutEditor && !showingLogoEditor else { return }
+            dismissPanel()
+            refreshProjectSelection()
+            commentStage = false
+            versionNumber = suggestedVersionNumber() ?? versionNumber
+            if !showingLogoEditor { restoreVersionFocus() }
+        }
+        .onChange(of: projectWatcher.revision) { _, _ in refreshProjectSelection() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            if didRestore, NSApp.keyWindow is PVUtilityWindow { refreshProjectSelection() }
+        }
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didUnmountNotification)) { _ in refreshProjectSelection() }
+        .onDisappear { projectWatcher.stop() }
+        .onAppear {
+            guard !didRestore else { return }
+            didRestore = true
+            visualsActive = NSApp.isActive
+            userLogos.reload()
+            // Never discard a saved custom choice if its file needs migration or access.
+            PVBrand.applySelectedIcon()
+
+            guard !showingWelcome else { return }
+            restoreSavedProject()
+
+            selectingProject = sourceProjectURL == nil
+            if !selectingProject { DispatchQueue.main.async { restoreComposerFocus() } }
+        }
+    }
+
+    @ViewBuilder
+    private func panelBody(maxHeight: CGFloat) -> some View {
+        Group {
+            switch activePanel {
+            case .settings:
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack {
+                        Text(PVL("Настройки")).font(.system(size: 20, weight: .medium))
+                        Spacer()
+                        Menu {
+                            Button("English") { interfaceLanguage = "en" }
+                            Button("Русский") { interfaceLanguage = "ru" }
+                        } label: {
+                            Text(interfaceLanguage == "ru" ? "Ru" : "En")
+                                .font(.system(size: 12, weight: .medium)).foregroundStyle(theme.muted)
+                        }
+                        .menuStyle(.borderlessButton).fixedSize()
+                        .accessibilityLabel(interfaceLanguage == "ru" ? "Язык интерфейса" : "Interface language")
+                    }.padding(.horizontal, 24)
+                    PVPersistentScrollView(scrollRequest: updateScrollRequest, memory: settingsScroll) {
+                        VStack(alignment: .leading, spacing: 24) {
+                            settingsDisclosure
+                            Divider().overlay(theme.border)
+                            backupCard
+                            Divider().overlay(theme.border)
+                            updateSettings
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, 18).padding(.top, 8).padding(.bottom, 16)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(theme.ink).tint(theme.accent).preferredColorScheme(.dark)
+                        .onExitCommand { dismissPanel() }
+                    }
+                    .padding(.leading, 24).padding(.trailing, 12)
+                }
+                .padding(.vertical, 24).frame(width: 510, height: min(420, maxHeight)).background(theme.panel)
+            case .backups:
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text(PVL("Резервное копирование")).font(.system(size: 20, weight: .medium))
+                        backupCard
+                    }.padding(24)
+                }.frame(width: 510, height: min(310, maxHeight)).background(theme.panel)
+            case .help:
+                PVPersistentScrollView {
+                    PVHelpView(replayWelcome: replayWelcome, checkUpdates: checkUpdatesFromHelp)
+                        .environmentObject(hotKey)
+                        .padding(.trailing, 10)
+                }.padding(.trailing, 10)
+                    .frame(width: 440, height: min(360, maxHeight)).background(theme.panel)
+            case .shortcut:
+                ShortcutEditor { dismissPanel() }.environmentObject(hotKey)
+                    .frame(width: 340, height: min(310, maxHeight)).background(theme.panel)
+            case .logoEditor:
+                ScrollView {
+                    PVLogoColorEditor(library: userLogos, slot: editedLogoSlot, saved: {
+                        logoVariant = editedLogoSlot ?? "custom"
+                        showingLogoEditor = false
+                    }, close: { showingLogoEditor = false })
+                }.frame(width: 470, height: min(420, maxHeight)).background(theme.panel)
+            case nil:
+                EmptyView()
+            }
+        }
+        .modifier(PVFloatingSurface())
+        .onExitCommand { dismissPanel() }
+    }
+
+    private var welcomePage: some View {
+        PVWelcomeScreen(ink: theme.ink, muted: theme.muted, visible: visibleWindow, continueAction: finishWelcome).id(welcomeID)
+    }
+
+    private func finishWelcome() {
+        guard showingWelcome else { return }
+        PVWelcomePolicy.complete()
+        clearTextFocus()
+        restoreSavedProject()
+        selectingProject = sourceProjectURL == nil
+        welcomeTransitioning = true
+        withAnimation(reduceMotion ? nil : .timingCurve(0.16, 1, 0.3, 1, duration: 1.15)) { showingWelcome = false }
+        welcomeTask?.cancel()
+        welcomeTask = Task { @MainActor in
+            if !reduceMotion {
+                do { try await Task.sleep(nanoseconds: 1_170_000_000) } catch { return }
+            }
+            welcomeTransitioning = false
+            restoreComposerFocus()
+        }
+    }
+
+    private func openPanel(_ panel: Panel, pinned: Bool = true, centered: Bool = false) {
+        if activePanel == .settings && panel != .settings { settingsScroll.closedAt = Date() }
+        if panel == .settings && activePanel != .settings { settingsScroll.prepareToOpen(); updateScrollRequest = 0 }
+        panelCentered = centered || panel == .logoEditor
+        panelHovered = false
+        panelCloseTask?.cancel()
+        panelPinned = pinned || panelCentered
+        if let window = NSApp.keyWindow {
+            let point = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+            panelAnchor = CGPoint(x: point.x, y: window.frame.height - point.y)
+        }
+        hoverTask?.cancel()
+        hoverIntent = nil
+        activePanel = panel
+    }
+
+    private func dismissPanel() {
+        if activePanel == .settings { settingsScroll.closedAt = Date() }
+        panelCentered = false
+        panelHovered = false
+        panelCloseTask?.cancel()
+        panelPinned = false
+        hoverTask?.cancel()
+        hoverIntent = nil
+        activePanel = nil
+    }
+
+    private func schedulePanel(_ panel: Panel, hovering: Bool) {
+        if !hovering {
+            if hoverIntent == panel { hoverTask?.cancel(); hoverIntent = nil }
+            return
+        }
+        guard !showingWelcome, !welcomeTransitioning else { return }
+        hoverTask?.cancel()
+        hoverIntent = panel
+        hoverTask = Task { @MainActor in
+            do { try await Task.sleep(nanoseconds: 300_000_000) } catch { return }
+            guard hoverIntent == panel, !showingWelcome, !welcomeTransitioning else { return }
+            openPanel(panel, pinned: false)
+        }
+    }
+
+    private func panelPosition(in size: CGSize) -> CGPoint {
+        if panelCentered { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        let dimensions: CGSize
+        let available = size.height - 32
+        switch activePanel {
+        case .settings: dimensions = CGSize(width: 510, height: min(420, available))
+        case .backups: dimensions = CGSize(width: 510, height: min(310, available))
+        case .help: dimensions = CGSize(width: 440, height: min(360, available))
+        case .shortcut: dimensions = CGSize(width: 340, height: min(310, available))
+        case .logoEditor: dimensions = CGSize(width: 470, height: min(420, available))
+        case nil: dimensions = .zero
+        }
+        let half = CGSize(width: dimensions.width / 2, height: dimensions.height / 2)
+        return CGPoint(x: min(max(panelAnchor.x, half.width + 16), size.width - half.width - 16),
+                       y: min(max(panelAnchor.y, half.height + 16), size.height - half.height - 16))
+    }
+
+    private func schedulePanelClose(_ panel: Panel) {
+        panelCloseTask?.cancel()
+        panelCloseTask = Task { @MainActor in
+            do { try await Task.sleep(nanoseconds: 160_000_000) } catch { return }
+            if !panelPinned && activePanel == panel { dismissPanel() }
+        }
+    }
+
+    private func returnHome() {
+        welcomeTask?.cancel()
+        welcomeTransitioning = false
+        if showingWelcome { PVWelcomePolicy.complete() }
+        showingWelcome = false
+        dismissPanel()
+        showVersionStage()
+    }
+
+    private func handleEscape() {
+        if activePanel != nil { dismissPanel() }
+        else if showingWelcome { finishWelcome() }
+        else if commentStage { showVersionStage() }
+        else { NSApp.hide(nil) }
+    }
+
+    private func replayWelcome() {
+        dismissPanel()
+        clearTextFocus()
+        welcomeID = UUID()
+        showingWelcome = true
+    }
+
+    private func checkUpdatesFromHelp() {
+        openPanel(.settings, centered: true)
+        updateScrollRequest &+= 1
+        updates.check()
+    }
+
+    private var updateSettings: some View {
+        PVUpdateSettings(service: updates)
+    }
+
+    private func clearTextFocus() {
+        stageFocusTask?.cancel()
+        focusedField = nil
+        commentHasFocus = false
+        if NSApp.keyWindow is PVUtilityWindow, let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isFieldEditor {
+            NSApp.keyWindow?.makeFirstResponder(nil)
+        }
+    }
+
+    private func restoreVersionFocus() {
+        guard sourceProjectURL != nil, !selectingProject else { return }
+        focusedField = .version
+        versionFocusRequest &+= 1
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Button(action: returnHome) {
+                HStack(spacing: 10) {
+                    PVHeaderMark(tint: theme.muted).frame(width: 25, height: 25)
+                        .scaleEffect(headerHovered && !reduceMotion ? 1.10 : 1)
+                    Text("Premiere Versions").font(.system(size: 12, weight: .medium))
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain).help(PVL("На главный экран"))
+                .onHover { inside in
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { headerHovered = inside }
+                }
+            Spacer()
+            HStack(spacing: 9) {
+                Text(AppRelease.label).font(.system(size: 10, design: .monospaced))
+            }.frame(height: 28).contentShape(Rectangle())
+                .help(PVL("Информация о программе"))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(PVL("Информация: ") + AppRelease.label)
+                .accessibilityAction { openPanel(.help, centered: true) }
+                .onHover { schedulePanel(.help, hovering: $0) }
+            Image(systemName: "gearshape")
+                .overlay(alignment: .topTrailing) { if updates.available != nil { Circle().fill(Color(red: 0.85, green: 0.43, blue: 0.47)).frame(width: 5, height: 5).offset(x: 4, y: -2) } }
+                .padding(.leading, 14).frame(width: 24, height: 28).contentShape(Rectangle())
+                .help(PVL("Настройки")).accessibilityLabel(PVL("Настройки"))
+                .accessibilityAction { openPanel(.settings, centered: true) }
+                .onHover { schedulePanel(.settings, hovering: $0) }
+
+        }
+        .foregroundStyle(theme.muted)
+        .padding(.horizontal, 28).padding(.top, 14).padding(.bottom, 14)
+    }
+
+    private var projectCard: some View {
+        Button(action: showProjectStage) {
+            HStack(spacing: 8) {
+                Text(projectName.isEmpty ? PVL("Выбрать проект") : projectName)
+                    .font(.system(size: 20, weight: .regular)).lineLimit(1).truncationMode(.middle)
+                Image(systemName: "chevron.up").font(.system(size: 11, weight: .light))
+            }.padding(.horizontal, 30).padding(.vertical, 5)
+        }
+        .buttonStyle(.plain)
+        .help(sourceProjectURL?.path ?? PVL("Выбрать проект Premiere Pro"))
+        .accessibilityLabel(PVL("Текущий проект: ") + (projectName.isEmpty ? PVL("не выбран") : projectName) + PVL(". Изменить проект"))
+    }
+
+    private var stagedComposer: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                projectSelectionCard.frame(width: geometry.size.width, height: geometry.size.height)
+                    .allowsHitTesting(selectingProject).accessibilityHidden(!selectingProject)
+                versionCard.frame(width: geometry.size.width, height: geometry.size.height)
+                    .allowsHitTesting(!selectingProject && !commentStage).accessibilityHidden(selectingProject || commentStage)
+                commentCard.frame(width: geometry.size.width, height: geometry.size.height)
+                    .allowsHitTesting(commentStage).accessibilityHidden(!commentStage)
+            }
+            .offset(y: selectingProject ? 0 : -(commentStage ? 2 : 1) * geometry.size.height)
+            .animation(reduceMotion ? nil : .timingCurve(0.42, 0, 0.35, 1, duration: 0.86), value: commentStage)
+        }
+        .animation(reduceMotion ? nil : .timingCurve(0.42, 0, 0.35, 1, duration: 0.86), value: selectingProject)
+        .clipped()
+        .background {
+            PVStageScrollCapture(enabled: activePanel == nil && !showingWelcome && !welcomeTransitioning) { direction in
+                if selectingProject { if direction > 0 { continueFromProject() } }
+                else if direction > 0 && !commentStage { showCommentStage() }
+                else if direction < 0 && commentStage { showVersionStage() }
+            }
+        }
+        .overlay {
+            GeometryReader { geometry in
+                scrollHint.opacity(selectingProject && sourceProjectURL == nil ? 0 : 1)
+                    .blur(radius: selectingProject && sourceProjectURL == nil ? 7 : 0)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.55), value: sourceProjectURL)
+                    .position(x: geometry.size.width - 42,
+                                    y: composerAxis(geometry.size.height, comment: commentStage))
+                    .animation(reduceMotion ? nil : .timingCurve(0.42, 0, 0.35, 1, duration: 0.86), value: commentStage)
+            }
+        }
+    }
+
+    private var scrollHint: some View {
+        Button { if selectingProject { continueFromProject() } else if commentStage { showVersionStage() } else { showCommentStage() } } label: {
+            ZStack {
+                Text("SCROLL").fixedSize().rotationEffect(.degrees(-90))
+                Image(systemName: "arrow.down")
+                    .opacity(commentStage ? 0 : 1)
+                    .animation(reduceMotion ? nil : (commentStage ? .easeOut(duration: 0.10) : .easeIn(duration: 0.18).delay(0.56)), value: commentStage)
+                    .offset(y: commentStage ? -8 : 48)
+                Image(systemName: "arrow.up")
+                    .opacity(commentStage ? 1 : 0)
+                    .animation(reduceMotion ? nil : (commentStage ? .easeIn(duration: 0.18).delay(0.56) : .easeOut(duration: 0.10)), value: commentStage)
+                    .offset(y: commentStage ? -48 : 8)
+            }
+            .font(.system(size: 13, weight: .light))
+            .foregroundStyle(theme.muted.opacity(0.55))
+            .frame(width: 28, height: 132).contentShape(Rectangle())
+            .animation(reduceMotion ? nil : .timingCurve(0.42, 0, 0.35, 1, duration: 0.86), value: commentStage)
+        }
+        .buttonStyle(.plain)
+        .disabled(activePanel != nil || sourceProjectURL == nil)
+        .accessibilityLabel(commentStage ? PVL("Прокрутить вверх к версии") : PVL("Прокрутить вниз к комментарию"))
+    }
+
+    private func composerAxis(_ height: CGFloat, comment: Bool) -> CGFloat {
+        height / 2 - 20 + (comment ? 18 : 0)
+    }
+
+    private var projectSelectionCard: some View {
+        GeometryReader { geometry in
+            let axis = composerAxis(geometry.size.height, comment: false)
+            ZStack {
+                if sourceProjectURL == nil && !missingProjectName.isEmpty {
+                    Text(PVL("Проект недоступен")).font(.system(size: 12, weight: .light)).foregroundStyle(theme.muted)
+                        .position(x: geometry.size.width / 2, y: axis - 52)
+                }
+                Text(sourceProjectURL == nil ? (missingProjectName.isEmpty ? PVL("Выбери проект") : missingProjectName) : projectName)
+                    .font(.system(size: 38, weight: .light)).lineLimit(2).multilineTextAlignment(.center)
+                    .frame(maxWidth: geometry.size.width - 120)
+                    .position(x: geometry.size.width / 2, y: axis)
+                if sourceProjectURL == nil && missingProjectName.isEmpty {
+                    Text(PVL("файл .prproj")).font(.system(size: 13, weight: .light)).foregroundStyle(theme.muted.opacity(0.55))
+                        .position(x: geometry.size.width / 2, y: axis + 42)
+                }
+                Button(action: chooseProject) {
+                    Label(sourceProjectURL == nil ? PVL("Выбрать файл") : PVL("Другой проект"), systemImage: "folder")
+                        .font(.system(size: 13, weight: .light))
+                }.buttonStyle(.plain).position(x: geometry.size.width / 2, y: axis + (sourceProjectURL == nil ? 88 : 54))
+                Button(action: continueFromProject) {
+                    Text("press return").font(.system(size: 13, weight: .light)).foregroundStyle(theme.muted.opacity(0.55))
+                }.buttonStyle(.plain).keyboardShortcut(.defaultAction)
+                    .disabled(sourceProjectURL == nil || !selectingProject)
+                    .opacity(sourceProjectURL == nil ? 0 : 1).blur(radius: sourceProjectURL == nil ? 8 : 0)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.55), value: sourceProjectURL)
+                    .position(x: geometry.size.width / 2, y: axis + 88)
+            }.foregroundStyle(theme.ink)
+        }
+    }
+    private func showProjectStage() {
+        clearTextFocus(); refreshProjectSelection()
+        commentStage = false; selectingProject = true
+    }
+    private func continueFromProject() {
+        guard selectingProject, validateCurrentProject() else { return }
+        selectingProject = false; commentStage = false; scheduleStageFocus()
+    }
+    private func refreshProjectSelection() {
+        let wasSelected = sourceProjectURL != nil
+        let number = versionNumber
+        restoreSavedProject()
+        if sourceProjectURL == nil {
+            projectWatcher.stop(); selectingProject = true; commentStage = false; clearTextFocus()
+        } else if wasSelected { versionNumber = number }
+    }
+    private func validateCurrentProject() -> Bool {
+        refreshProjectSelection()
+        return sourceProjectURL != nil
+    }
+
+    private var versionCard: some View {
+        GeometryReader { geometry in
+            let axis = composerAxis(geometry.size.height, comment: false)
+            ZStack {
+            PVVersionInput(text: $versionNumber,
+                           isFocused: focusedField == .version && !selectingProject && !commentStage,
+                           focusRequest: versionFocusRequest,
+                           enabled: sourceProjectURL != nil,
+                           color: NSColor(theme.ink),
+                           fontSize: 82, caret: NSColor(theme.accent), centered: true,
+                           focused: { focusedField = .version },
+                           blurred: { if focusedField == .version { focusedField = nil } },
+                           submitted: showCommentStage)
+                .frame(width: min(400, max(100, (versionNumber as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 82, weight: .light)]).width + 8)), height: 108)
+                .overlay(alignment: .leading) {
+                    HStack(spacing: 9) {
+                        PVAxisLabel(text: previousVersionLabel, color: NSColor(theme.muted))
+                        Image(systemName: "arrow.right").font(.system(size: 13, weight: .light))
+                    }
+                    .font(.system(size: 16, weight: .light)).foregroundStyle(theme.muted)
+                    .fixedSize()
+                    .alignmentGuide(.leading) { $0[.trailing] + 24 }
+                    .allowsHitTesting(false)
+                    .accessibilityLabel(PVL("Прошлая версия: ") + previousVersionLabel)
+                }
+                .accessibilityLabel(PVL("Следующая версия"))
+                .position(x: geometry.size.width / 2, y: axis)
+                Button(action: showCommentStage) {
+                    Text("press return").font(.system(size: 13, weight: .light))
+                        .foregroundStyle(theme.muted.opacity(0.55))
+                }.buttonStyle(.plain).disabled(sourceProjectURL == nil)
+                    .position(x: geometry.size.width / 2, y: axis + 74)
+            }
+        }
+    }
+
+    private var commentCard: some View {
+        GeometryReader { geometry in
+            let axis = composerAxis(geometry.size.height, comment: true)
+            ZStack {
+                Text(versionNumber).font(.system(size: 16, weight: .light)).foregroundStyle(theme.muted)
+                    .position(x: geometry.size.width / 2, y: axis - 72)
+            PVVersionInput(text: $versionComment,
+                           isFocused: focusedField == .comment && commentStage,
+                           focusRequest: versionFocusRequest,
+                           enabled: sourceProjectURL != nil,
+                           color: NSColor(theme.ink),
+                           fontSize: 48, caret: NSColor(theme.accent), centered: false,
+                           placeholder: "comment", accessibilityTitle: PVL("Комментарий к версии, необязательно"),
+                           focused: { focusedField = .comment },
+                           blurred: { if focusedField == .comment { focusedField = nil } },
+                           submitted: createVersion)
+                .frame(width: min(540, max(32, ((versionComment.isEmpty ? "comment" : versionComment) as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 48, weight: .light)]).width + 6))).frame(height: 88)
+                .position(x: geometry.size.width / 2, y: axis)
+                Button(action: createVersion) {
+                    Text("press return to save").font(.system(size: 13, weight: .light))
+                        .foregroundStyle(theme.muted.opacity(0.55))
+                }.buttonStyle(.plain).disabled(sourceProjectURL == nil)
+                    .position(x: geometry.size.width / 2, y: axis + 64)
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            Button(action: showVersionStage) { Text("← version").font(.system(size: 12, weight: .light)) }
+                .buttonStyle(.plain).foregroundStyle(theme.muted).padding(.leading, 30).padding(.bottom, 12)
+        }
+    }
+
+    private func showCommentStage() {
+        guard validateCurrentProject(), !selectingProject, !commentStage else { return }
+        let trimmed = versionNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard trimmed.range(of: #"^v\d{3,}$"#, options: .regularExpression) != nil else {
+            statusMessage = PVL("Номер версии должен быть в формате v008")
+            isError = true
+            restoreVersionFocus()
+            return
+        }
+        versionNumber = trimmed
+        isError = false
+        clearTextFocus()
+        commentStage = true
+        scheduleStageFocus()
+    }
+
+    private func showVersionStage() {
+        clearTextFocus()
+        selectingProject = sourceProjectURL == nil
+        commentStage = false
+        scheduleStageFocus()
+    }
+
+    private func scheduleStageFocus() {
+        stageFocusTask?.cancel()
+        stageFocusTask = Task { @MainActor in
+            if !reduceMotion {
+                do { try await Task.sleep(nanoseconds: 880_000_000) } catch { return }
+            }
+            guard activePanel == nil, !showingWelcome else { return }
+            restoreComposerFocus()
+        }
+    }
+
+    private func restoreComposerFocus() {
+        guard sourceProjectURL != nil, !selectingProject, activePanel == nil, !showingWelcome else { return }
+        focusedField = commentStage ? .comment : .version
+        versionFocusRequest &+= 1
+    }
+
+    private var needsSearchAccess: Bool {
+        UserDefaults.standard.data(forKey: searchMode == "folder" ? "autosaveWatchBookmark" : "computerSearchBookmark") == nil || UserDefaults.standard.data(forKey: "autosaveArchiveBookmark") == nil
+    }
+
+    private var needsArchiveAccess: Bool {
+        UserDefaults.standard.data(forKey: "autosaveArchiveBookmark") == nil || UserDefaults.standard.data(forKey: "archiveBookmark") == nil
+    }
+
+    private var compactBackupStatus: String {
+        if autosaveMonitor.isScanning { return PVL("Проверка…") }
+        if !autosaveMonitoringEnabled { return PVL("Выключен") }
+        if needsSearchAccess || needsArchiveAccess { return PVL("Нужен доступ") }
+        if PVL(autosaveMonitor.status).localizedCaseInsensitiveContains(PVL("ошибка")) { return PVL("Ошибка проверки") }
+        return PVL("Мониторинг включён")
+    }
+
+    private var backupCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Button {} label: {
+                    HStack(spacing: 8) {
+                        Circle().fill(autosaveMonitoringEnabled ? theme.mint : theme.muted.opacity(0.5)).frame(width: 6, height: 6)
+                        Text(PVL("Резервные копии")).font(.system(size: 13, weight: .medium))
+                        Text(PVL(compactBackupStatus)).font(.system(size: 10)).foregroundStyle(theme.muted)
+                    }
+                }.buttonStyle(.plain).accessibilityLabel(PVL("Показать подробности резервного копирования"))
+                Spacer(minLength: 4)
+                Toggle(PVL("Резервное копирование"), isOn: $autosaveMonitoringEnabled)
+                    .labelsHidden().toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
+                    .onChange(of: autosaveMonitoringEnabled) { _, enabled in
+                        if enabled { autosaveMonitor.start() } else { autosaveMonitor.stop() }
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                if let since = autosaveMonitor.monitoringSince {
+                    TimelineView(.periodic(from: .now, by: 30)) { context in
+                        Text(PVL("Мониторинг включён") + " · " + PVUptime.label(since: since, now: context.date))
+                            .font(.system(size: 11)).foregroundStyle(theme.muted)
+                    }
+                }
+                Text(PVL(autosaveMonitor.status))
+                    .font(.system(size: 11)).foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .help(PVL(autosaveMonitor.status)).textSelection(.enabled)
+                HStack(spacing: 8) {
+                    if searchMode == "all" ? needsSearchAccess : UserDefaults.standard.data(forKey: "autosaveWatchBookmark") == nil {
+                        Button(searchMode == "folder" ? PVL("Выбрать папку…") : PVL("Разрешить поиск…")) {
+                            if searchMode == "folder" { chooseAutosaveWatchFolder() }
+                            else { panelPinned = true; autosaveMonitor.authorizeComputer() }
+                        }.buttonStyle(PVQuietButtonStyle())
+                    }
+                    if needsArchiveAccess {
+                        Button(PVL("Разрешить сохранение…")) { panelPinned = true; autosaveMonitor.authorizeArchives() }
+                            .buttonStyle(PVQuietButtonStyle())
+                    }
+                    Button(autosaveMonitor.isScanning ? PVL("Проверка…") : PVL("Проверить сейчас")) { autosaveMonitor.checkNow() }
+                        .buttonStyle(PVQuietButtonStyle())
+                        .disabled(autosaveMonitor.isScanning || needsSearchAccess)
+                    Spacer(minLength: 0)
+                    Button(action: openAutosaveArchive) { Image(systemName: "folder") }
+                        .buttonStyle(PVQuietButtonStyle()).help(PVL("Открыть архив автосейвов"))
+                }
+            }
+        }
+    }
+
+    private func openAutosaveArchive() {
+        do {
+            let url = try resolveBookmark(forKey: "autosaveArchiveBookmark")
+            try withScopedAccess(to: url) {
+                if !NSWorkspace.shared.open(url) { autosaveMonitor.status = PVL("Не удалось открыть архив") }
+            }
+        } catch {
+            autosaveMonitor.status = PVL("Сначала разреши доступ к папке архива")
+        }
+    }
+
+    private var settingsDisclosure: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                    Image(systemName: "folder").font(.system(size: 12)).foregroundStyle(theme.muted)
+                    Text(PVL("Расположение папок")).font(.system(size: 13, weight: .medium))
+            }
+
+            VStack(alignment: .leading, spacing: 16) {
+                Picker(PVL("Где искать проекты"), selection: $searchMode) {
+                    Text(PVL("Компьютер и подключённые диски")).tag("all")
+                    Text(PVL("Только выбранная папка")).tag("folder")
+                }
+                .onChange(of: searchMode) { _, _ in autosaveMonitor.configurationChanged() }
+                if searchMode == "folder" {
+                    settingPathRow(title: PVL("Папка поиска"), path: autosaveWatchPath.isEmpty ? PVL("Не выбрана") : autosaveWatchPath,
+                                   buttonTitle: PVL("Изменить…"), action: chooseAutosaveWatchFolder)
+                }
+                settingPathRow(title: PVL("Куда сохранять версии"), path: archivePath,
+                               buttonTitle: PVL("Изменить…"), action: chooseArchiveFolder)
+                settingPathRow(title: PVL("Куда сохранять автосейвы"), path: autosaveArchivePath,
+                               buttonTitle: PVL("Изменить…"), action: chooseAutosaveArchiveFolder)
+                Divider().overlay(theme.border)
+                Toggle(PVL("Показывать в Dock"), isOn: Binding(
+                    get: { showInDock },
+                    set: { value in if !value { menuBarIconEnabled = true }; showInDock = value }))
+                    .toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
+                Toggle(PVL("Показывать значок в строке меню"), isOn: Binding(get: { menuBarIconEnabled }, set: { value in if !value { showInDock = true }; menuBarIconEnabled = value }))
+                    .toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
+                Text(PVL("Значок Dock")).font(.system(size: 13, weight: .medium))
+                logoChoices
+                persistentIconAccess
+                if let notice = userLogos.storageNotice {
+                    Text(PVL(notice)).font(.system(size: 11)).foregroundStyle(theme.muted)
+                    Button(PVL("Восстановить прежний значок…")) { userLogos.importLegacyFolder() }
+                        .buttonStyle(PVQuietButtonStyle())
+                }
+            }
+            .font(.system(size: 12))
+        }
+    }
+
+    @ViewBuilder
+    private var persistentIconAccess: some View {
+        if let notice = fileIcons.notice {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(PVL(notice)).font(.system(size: 11)).foregroundStyle(theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(PVL("Разрешить")) {
+                    panelPinned = true
+                    if let image = userLogos.image(for: logoVariant) { fileIcons.authorizeAndApply(image) }
+                }
+                .buttonStyle(PVQuietButtonStyle())
+                .disabled(fileIcons.isApplying)
+            }
+        }
+    }
+
+    private var availableLogoIDs: [String] {
+        var ids = PVBrand.variants.map(\.id)
+        if userLogos.currentImage != nil { ids.append("custom") }
+        if userLogos.previousImage != nil { ids.append("previous") }
+        return ids
+    }
+
+    private func logoTitle(_ id: String) -> String {
+        if id == "custom" { return PVL("Пользовательский цвет") }
+        if id == "previous" { return PVL("Предыдущий пользовательский цвет") }
+        return PVL(PVBrand.variants.first(where: { $0.id == id })?.title ?? PVL("Логотип"))
+    }
+
+    private var logoChoices: some View {
+        let builtins = PVBrand.variants.map(\.id).filter { $0 != logoVariant }
+        let columns = builtins.count > 6 ? 4 : 3
+        let width: CGFloat = columns == 4 ? 44 : 56
+        return HStack(spacing: 16) {
+            Group { if let image = userLogos.image(for: logoVariant) { Image(nsImage: image).resizable().scaledToFit() } }
+                .frame(width: 128, height: 128)
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(width), spacing: 8), count: columns), spacing: 12) {
+                ForEach(builtins, id: \.self) { id in logoOption(id, width: width) }
+            }.frame(width: CGFloat(columns) * width + CGFloat(columns - 1) * 8, height: 128)
+            Rectangle().fill(theme.border).frame(width: 1, height: 122)
+            VStack(spacing: 12) {
+                logoOption("custom", width: width)
+                logoOption("previous", width: width)
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+    private func logoOption(_ id: String, width: CGFloat) -> some View {
+        let custom = ["custom", "previous"].contains(id)
+        let image = userLogos.image(for: id)
+        return ZStack(alignment: .topTrailing) {
+            Button {
+                if custom && (image == nil || logoVariant == id) {
+                    editedLogoSlot = id; openPanel(.logoEditor)
+                } else { logoVariant = id }
+            } label: {
+                Group {
+                    if let image { Image(nsImage: image).resizable().scaledToFit() }
+                    else { Image(systemName: "pencil").font(.system(size: 22, weight: .light)).foregroundStyle(theme.muted.opacity(0.65)) }
+                }.frame(width: width, height: 58)
+                    .overlay {
+                        if custom { RoundedRectangle(cornerRadius: 11).strokeBorder(theme.border, style: StrokeStyle(lineWidth: 1, dash: image == nil ? [4, 4] : [])) }
+                    }
+            }.buttonStyle(.plain).accessibilityLabel(custom && image == nil ? PVL("Создать свой значок") : logoTitle(id))
+            if custom && image != nil {
+                Button {
+                    do {
+                        try userLogos.remove(slot: id)
+                        if logoVariant == id { logoVariant = "signature-dark" }
+                    } catch { statusMessage = error.localizedDescription; isError = true }
+                } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 14)).foregroundStyle(theme.muted, theme.panel)
+                }.buttonStyle(.plain).offset(x: 4, y: -4).accessibilityLabel(PVL("Удалить пользовательский значок"))
+            }
+        }.frame(width: width, height: 58)
+    }
+
+    private func settingPathRow(
+        title: String,
+        path: String,
+        buttonTitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title).font(.subheadline.weight(.medium))
+                Spacer()
+                Button(buttonTitle, action: action)
+                    .buttonStyle(PVQuietButtonStyle())
+                    .controlSize(.small)
+            }
+            Text(path)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .textSelection(.enabled)
+        }
+    }
+
+    private var footer: some View {
+        VStack(spacing: 10) {
+            if isError {
+                Label(PVL(statusMessage), systemImage: "exclamationmark.circle")
+                    .font(.system(size: 12)).foregroundStyle(Color(red: 1, green: 0.72, blue: 0.76))
+                    .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+            }
+            if PVL(hotKey.status).localizedCaseInsensitiveContains(PVL("недоступно")) || PVL(hotKey.status).localizedCaseInsensitiveContains(PVL("не удалось")) {
+                Text(PVL(hotKey.status)).font(.system(size: 11)).foregroundStyle(theme.muted)
+            }
+            HStack {
+                Label(autosaveMonitor.isScanning ? PVL("Проверка…") :
+                        !autosaveMonitoringEnabled ? PVL("Резервирование выключено") :
+                        needsSearchAccess || needsArchiveAccess ? PVL("Разрешить резервирование") : PVL("Резервирование включено"),
+                      systemImage: needsSearchAccess || needsArchiveAccess ? "exclamationmark.circle" : "checkmark.circle")
+                    .font(.system(size: 11, weight: .regular))
+                    .contentShape(Rectangle())
+                    .onHover { schedulePanel(.backups, hovering: $0) }
+                    .accessibilityAction { openPanel(.backups, centered: true) }
+                    .help(PVL(autosaveMonitor.status) + PVL("\nНаведи, чтобы открыть резервное копирование"))
+                Spacer()
+                Text(hotKey.shortcut.display).font(.system(size: 12, weight: .light))
+                    .contentShape(Rectangle()).help(PVL("Изменить сочетание клавиш"))
+                    .accessibilityAction { openPanel(.shortcut, centered: true) }
+                    .onHover { schedulePanel(.shortcut, hovering: $0) }
+
+            }
+        }
+        .foregroundStyle(theme.muted)
+        .padding(.horizontal, 28).padding(.top, 12).padding(.bottom, 24)
+    }
+
+    private var nextVersionLabel: String {
+        guard sourceProjectURL != nil else { return "—" }
+        return suggestedVersionNumber() ?? PVL("Недоступна")
+    }
+
+    // MARK: - Security-scoped bookmarks
+
+    private func makeBookmark(for url: URL, key: String) throws {
+        let data = try url.bookmarkData(
+            options: [.withSecurityScope],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        UserDefaults.standard.set(data, forKey: key)
+    }
+
+    private func resolveBookmark(forKey key: String) throws -> URL {
+        guard let data = UserDefaults.standard.data(forKey: key) else {
+            throw NSError(
+                domain: "PremiereVersions",
+                code: 10,
+                userInfo: [NSLocalizedDescriptionKey: PVL("Сохранённый доступ отсутствует. Выбери папку или проект заново.")]
+            )
+        }
+
+        var stale = false
+        let url = try URL(
+            resolvingBookmarkData: data,
+            options: [.withSecurityScope],
+            relativeTo: nil,
+            bookmarkDataIsStale: &stale
+        )
+
+        if stale {
+            try makeBookmark(for: url, key: key)
+        }
+        return url
+    }
+
+    private func withScopedAccess<T>(to url: URL, operation: () throws -> T) throws -> T {
+        let started = url.startAccessingSecurityScopedResource()
+        defer {
+            if started {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        return try operation()
+    }
+
+    // MARK: - Project restore / selection
+
+    private func restoreSavedProject() {
+        guard UserDefaults.standard.data(forKey: "savedProjectBookmark") != nil else {
+            statusMessage = PVL("Выбери проект Premiere")
+            return
+        }
+
+        do {
+            let url = try resolveBookmark(forKey: "savedProjectBookmark")
+            try withScopedAccess(to: url) {
+                guard fileManager.fileExists(atPath: url.path), fileManager.isReadableFile(atPath: url.path),
+                      (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+                    throw NSError(
+                        domain: "PremiereVersions",
+                        code: 11,
+                        userInfo: [NSLocalizedDescriptionKey: PVL("Сохранённый проект не найден.")]
+                    )
+                }
+            }
+
+            sourceProjectURL = url
+            projectWatcher.watch(url)
+            lastProjectFolder = url.deletingLastPathComponent().path
+            UserDefaults.standard.set(url.lastPathComponent, forKey: "lastProjectName")
+            missingProjectName = ""
+            projectName = url.deletingPathExtension().lastPathComponent
+            versionNumber = suggestedVersionNumber() ?? "v001"
+            statusMessage = PVL("Последний проект восстановлен")
+            isError = false
+        } catch {
+            missingProjectName = projectName.isEmpty ? (UserDefaults.standard.string(forKey: "lastProjectName") ?? "") : projectName
+            sourceProjectURL = nil
+            projectName = ""
+            statusMessage = PVL("Выбери проект Premiere")
+            isError = false
+        }
+    }
+
+    private func chooseProject() {
+        panelPinned = true
+        clearTextFocus()
+        defer { restoreComposerFocus() }
+        let panel = NSOpenPanel()
+        panel.title = PVL("Выбрать проект Premiere")
+        panel.message = PVL("Выбери файл .prproj")
+        panel.allowedContentTypes = [UTType(filenameExtension: "prproj") ?? .data]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+
+        let startPath = !lastProjectFolder.isEmpty ? lastProjectFolder :
+            (!defaultProjectFolder.isEmpty ? defaultProjectFolder : DefaultLocations.home.appendingPathComponent("Desktop").path)
+
+        let startURL = URL(fileURLWithPath: startPath, isDirectory: true)
+        panel.directoryURL = PVProjectLocation.nearestFolder(to: startURL)
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            // The panel grants access to the selected file. Save a bookmark for that file,
+            // not for its parent directory (the latter is not separately authorized).
+            try withScopedAccess(to: url) {
+                try makeBookmark(for: url, key: "savedProjectBookmark")
+            }
+
+            sourceProjectURL = url
+            projectWatcher.watch(url)
+            lastProjectFolder = url.deletingLastPathComponent().path
+            UserDefaults.standard.set(url.lastPathComponent, forKey: "lastProjectName")
+            missingProjectName = ""
+            commentStage = false
+            versionComment = ""
+            projectName = url.deletingPathExtension().lastPathComponent
+            versionNumber = suggestedVersionNumber() ?? "v001"
+            statusMessage = PVL("Проект выбран и сохранён для следующего запуска")
+            isError = false
+        } catch {
+            sourceProjectURL = nil
+            projectName = ""
+            statusMessage = PVL("Не удалось сохранить доступ к проекту: \(error.localizedDescription)")
+            isError = true
+        }
+    }
+
+    // MARK: - Folder selection
+
+    private func chooseArchiveFolder() {
+        panelPinned = true
+        let panel = NSOpenPanel()
+        panel.title = PVL("Выбрать папку архива")
+        panel.message = PVL("Выбери корневую папку Premiere_Versions")
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+
+        let current = URL(fileURLWithPath: archivePath, isDirectory: true)
+        if fileManager.fileExists(atPath: current.path) {
+            panel.directoryURL = current
+        }
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try withScopedAccess(to: url) {
+                try makeBookmark(for: url, key: "archiveBookmark")
+            }
+            archivePath = url.path
+            autosaveMonitor.configurationChanged()
+            statusMessage = PVL("Папка архива и доступ сохранены")
+            isError = false
+        } catch {
+            statusMessage = PVL("Не удалось сохранить доступ к архиву: \(error.localizedDescription)")
+            isError = true
+        }
+    }
+
+    private func chooseDefaultProjectFolder() {
+        panelPinned = true
+        let panel = NSOpenPanel()
+        panel.title = PVL("Папка проекта по умолчанию")
+        panel.message = PVL("Эта папка будет открываться при выборе проекта")
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+
+        let startPath = !defaultProjectFolder.isEmpty ? defaultProjectFolder :
+            (!lastProjectFolder.isEmpty ? lastProjectFolder : DefaultLocations.home.appendingPathComponent("Desktop").path)
+        let startURL = URL(fileURLWithPath: startPath, isDirectory: true)
+        panel.directoryURL = PVProjectLocation.nearestFolder(to: startURL)
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try withScopedAccess(to: url) {
+                try makeBookmark(for: url, key: "defaultProjectFolderBookmark")
+            }
+            defaultProjectFolder = url.path
+            statusMessage = PVL("Папка по умолчанию сохранена")
+            isError = false
+        } catch {
+            statusMessage = PVL("Не удалось сохранить папку: \(error.localizedDescription)")
+            isError = true
+        }
+    }
+
+    // MARK: - Autosave monitoring
+
+    private func chooseAutosaveWatchFolder() {
+        panelPinned = true
+        chooseAutosaveFolder(
+            title: PVL("Папка наблюдения"),
+            message: PVL("Выбери папку, внутри которой Premiere хранит проекты и Adobe Premiere Pro Auto-Save"),
+            bookmarkKey: "autosaveWatchBookmark"
+        ) { url in
+            autosaveWatchPath = url.path
+            autosaveMonitor.status = PVL("Папка наблюдения выбрана")
+        }
+    }
+
+    private func chooseAutosaveArchiveFolder() {
+        panelPinned = true
+        chooseAutosaveFolder(
+            title: PVL("Архив автосейвов"),
+            message: PVL("Выбери папку, куда копировать резервные автосейвы"),
+            bookmarkKey: "autosaveArchiveBookmark"
+        ) { url in
+            autosaveArchivePath = url.path
+            autosaveMonitor.status = PVL("Папка архива автосейвов выбрана")
+        }
+    }
+
+    private func chooseAutosaveFolder(
+        title: String,
+        message: String,
+        bookmarkKey: String,
+        completion: (URL) -> Void
+    ) {
+        let panel = NSOpenPanel()
+        panel.title = title
+        panel.message = message
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+
+        let initial = bookmarkKey == "autosaveWatchBookmark" ? autosaveWatchPath : autosaveArchivePath
+        if !initial.isEmpty {
+            let url = URL(fileURLWithPath: initial, isDirectory: true)
+            if fileManager.fileExists(atPath: url.path) {
+                panel.directoryURL = url
+            }
+        }
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try withScopedAccess(to: url) {
+                try makeBookmark(for: url, key: bookmarkKey)
+            }
+            completion(url)
+            autosaveMonitor.configurationChanged()
+        } catch {
+            autosaveMonitor.status = PVL("Не удалось сохранить доступ: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Archive version numbering
+
+    private func withArchiveAccess<T>(operation: (URL) throws -> T) throws -> T {
+        let archiveURL = try resolveBookmark(forKey: "archiveBookmark")
+        return try withScopedAccess(to: archiveURL) {
+            try operation(archiveURL)
+        }
+    }
+
+    private var previousVersionLabel: String {
+        guard sourceProjectURL != nil else { return "—" }
+        guard let versions = archivedVersionNumbers() else { return PVL("Нет доступа") }
+        guard let latest = versions.max() else { return PVL("Ещё нет") }
+        return String(format: "v%03d", latest)
+    }
+
+    private func suggestedVersionNumber() -> String? {
+        guard let versions = archivedVersionNumbers(), (versions.max() ?? 0) < Int.max else { return nil }
+        return String(format: "v%03d", (versions.max() ?? 0) + 1)
+    }
+
+    /// Both labels use the same archive numbering, including manually entered versions.
+    private func archivedVersionNumbers() -> [Int]? {
+        guard !projectName.isEmpty else { return nil }
+        do {
+            return try withArchiveAccess { archiveURL in
+                let folder = archiveURL.appendingPathComponent(projectName, isDirectory: true)
+                guard fileManager.fileExists(atPath: folder.path) else { return [] }
+                let files = try fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+                let prefix = NSRegularExpression.escapedPattern(for: projectName)
+                let regex = try NSRegularExpression(pattern: "(?i)^" + prefix + #"_v(\d+)(?:_|\.|$)"#)
+                return files.compactMap { file in
+                    guard file.pathExtension.lowercased() == "prproj" else { return nil }
+                    let name = file.lastPathComponent
+                    let range = NSRange(name.startIndex..<name.endIndex, in: name)
+                    guard let match = regex.firstMatch(in: name, range: range),
+                          let numberRange = Range(match.range(at: 1), in: name) else { return nil }
+                    return Int(name[numberRange])
+                }
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    // MARK: - Save version
+
+    private func createVersion() {
+        guard validateCurrentProject(), let sourceURL = sourceProjectURL else {
+            statusMessage = PVL("Сначала выбери проект .prproj")
+            isError = true
+            return
+        }
+
+        let version = versionNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard version.range(of: #"^v\d{3,}$"#, options: .regularExpression) != nil else {
+            statusMessage = PVL("Номер версии должен быть в формате v008")
+            isError = true
+            return
+        }
+
+        do {
+            try withScopedAccess(to: sourceURL) {
+                try withArchiveAccess { archiveURL in
+                    let projectFolder = archiveURL.appendingPathComponent(projectName, isDirectory: true)
+                    try fileManager.createDirectory(
+                        at: projectFolder,
+                        withIntermediateDirectories: true
+                    )
+
+                    let formatter = DateFormatter()
+                    formatter.locale = Locale(identifier: "en_US_POSIX")
+                    formatter.timeZone = .current
+                    formatter.dateFormat = "dd-MM-yyyy-HH-mm-ss"
+                    let timestamp = formatter.string(from: Date())
+
+                    let comment = versionComment
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .replacingOccurrences(of: "/", with: "-")
+                        .replacingOccurrences(of: ":", with: "-")
+                        .replacingOccurrences(of: "\\", with: "-")
+
+                    var filename = "\(projectName)_\(version)_\(timestamp)"
+                    if !comment.isEmpty {
+                        filename += "_\(comment)"
+                    }
+                    filename += ".prproj"
+
+                    let destination = projectFolder.appendingPathComponent(filename)
+                    guard !fileManager.fileExists(atPath: destination.path) else {
+                        throw NSError(
+                            domain: "PremiereVersions",
+                            code: 12,
+                            userInfo: [NSLocalizedDescriptionKey: PVL("Файл с таким именем уже существует.")]
+                        )
+                    }
+
+                    try fileManager.copyItem(at: sourceURL, to: destination)
+                    statusMessage = PVL("Версия \(version) сохранена")
+                    isError = false
+                    versionComment = ""
+
+                    versionNumber = suggestedVersionNumber() ?? versionNumber
+                    // Hide the window; keep the shortcut and autosave service running.
+                    NSApp.hide(nil)
+                }
+            }
+
+        } catch {
+            statusMessage = PVL("Ошибка сохранения: \(error.localizedDescription)")
+            isError = true
+        }
+    }
+}
+
+struct PVTheme {
+    let dark: Bool
+    var canvas: Color { Color(red: 0.09, green: 0.075, blue: 0.22) }
+    var panel: Color { Color(red: 0.14, green: 0.105, blue: 0.255) }
+    var field: Color { Color.white.opacity(0.055) }
+    var ink: Color { Color(red: 0.93, green: 0.91, blue: 0.96) }
+    var muted: Color { Color(red: 0.80, green: 0.75, blue: 0.88) }
+    var border: Color { Color.white.opacity(0.09) }
+    var accent: Color { Color(red: 0.84, green: 0.71, blue: 0.93) }
+    var rose: Color { accent }
+    var mint: Color { accent }
+    var actionGradient: LinearGradient {
+        LinearGradient(colors: [canvas, Color(red: 0.395, green: 0.24, blue: 0.57)], startPoint: .bottomLeading, endPoint: .topTrailing)
+    }
+}
+
+struct PVQuietButtonStyle: ButtonStyle {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        let theme = PVTheme(dark: colorScheme == .dark)
+        configuration.label
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(theme.muted)
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(theme.field.opacity(configuration.isPressed ? 0.65 : 1), in: RoundedRectangle(cornerRadius: 9))
+            .overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(theme.border) }
+            .opacity(enabled ? 1 : 0.4)
+    }
+}
+
+struct PVSaveButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        PVGlowSaveButton(label: configuration.label, pressed: configuration.isPressed)
+    }
+}
+
+private struct PVGlowSaveButton: View {
+    let label: ButtonStyleConfiguration.Label
+    let pressed: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hovered = false
+    private var theme: PVTheme { PVTheme(dark: true) }
+    var body: some View {
+        label
+            .foregroundStyle(.white)
+            .background(theme.actionGradient, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 17).fill(
+                    RadialGradient(colors: [.white.opacity(hovered ? 0.20 : 0.07), .clear], center: .topLeading, startRadius: 0, endRadius: hovered ? 460 : 220)
+                ).allowsHitTesting(false)
+            }
+            .overlay { RoundedRectangle(cornerRadius: 17).strokeBorder(Color.white.opacity(hovered ? 0.35 : 0.16)) }
+            .shadow(color: theme.accent.opacity(enabled ? (hovered ? 0.32 : 0.14) : 0), radius: hovered ? 23 : 10, y: hovered ? 8 : 4)
+            .scaleEffect(reduceMotion ? 1 : (pressed ? 0.987 : hovered ? 1.006 : 1))
+            .opacity(enabled ? 1 : 0.4)
+            .onHover { hovered = $0 && enabled }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: hovered)
+            .animation(reduceMotion ? nil : .spring(response: 0.25, dampingFraction: 0.8), value: pressed)
+    }
+}
+
+private struct ShortcutEditor: View {
+    @EnvironmentObject private var hotKey: GlobalSaveHotKey
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var errorMessage: String?
+    @State private var recording = false
+    @StateObject private var inputSource = PVShortcutInput()
+    let close: () -> Void
+    private var theme: PVTheme { PVTheme(dark: true) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(PVL("Сочетание клавиш")).font(.system(size: 17, weight: .semibold))
+            Text(PVL("для открытия из Premiere Pro")).font(.system(size: 11, weight: .light)).foregroundStyle(theme.muted)
+            Text(PVL("Сейчас используется: ") + hotKey.shortcut.display)
+                .font(.system(size: 12)).foregroundStyle(theme.muted)
+            ZStack {
+                RoundedRectangle(cornerRadius: 13).fill(theme.accent.opacity(0.07))
+                RoundedRectangle(cornerRadius: 13).strokeBorder(theme.accent.opacity(0.5))
+                VStack(spacing: 5) {
+                    Image(systemName: "keyboard").font(.system(size: 20))
+                    Text(recording ? PVL("Нажми новое сочетание") : PVL("Изменить сочетание"))
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(theme.accent).allowsHitTesting(false)
+                if recording {
+                    ShortcutCaptureView(onKey: record)
+                } else {
+                    Button {
+                        inputSource.begin()
+                        recording = true
+                        errorMessage = nil
+                        hotKey.beginRecording()
+                    } label: {
+                        Color.clear.contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(PVL("Начать запись нового сочетания"))
+                }
+            }
+            .frame(height: 76)
+            Text(errorMessage ?? PVL("Esc — отменить."))
+                .font(.system(size: 11))
+                .foregroundStyle(errorMessage == nil ? theme.muted : .red)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button(PVL("Вернуть Option+S")) { apply(.defaultShortcut) }
+                    .buttonStyle(PVQuietButtonStyle())
+                Spacer()
+                Button(PVL("Отмена"), action: close)
+                    .buttonStyle(PVQuietButtonStyle())
+            }
+        }
+        .padding(20).frame(width: 340)
+        .foregroundStyle(theme.ink).background(theme.panel)
+        .onDisappear { inputSource.end(); hotKey.endRecording() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            inputSource.end(); hotKey.endRecording(); recording = false
+        }
+    }
+
+    private func apply(_ shortcut: SavedShortcut) {
+        if let error = hotKey.setShortcut(shortcut) { errorMessage = error }
+        else { inputSource.end(); close() }
+    }
+
+    private func record(_ event: NSEvent) {
+        guard recording, !event.isARepeat else { return }
+        if event.keyCode == UInt16(kVK_Escape) { close(); return }
+        var modifiers: UInt32 = 0
+        if event.modifierFlags.contains(.command) { modifiers |= UInt32(cmdKey) }
+        if event.modifierFlags.contains(.option) { modifiers |= UInt32(optionKey) }
+        if event.modifierFlags.contains(.control) { modifiers |= UInt32(controlKey) }
+        if event.modifierFlags.contains(.shift) { modifiers |= UInt32(shiftKey) }
+        let special: [UInt16: String] = [
+            UInt16(kVK_Return): "↩", UInt16(kVK_Tab): "⇥", UInt16(kVK_Space): "Space",
+            UInt16(kVK_Delete): "⌫", UInt16(kVK_ForwardDelete): "⌦", UInt16(kVK_ANSI_KeypadEnter): "⌤",
+            UInt16(kVK_LeftArrow): "←", UInt16(kVK_RightArrow): "→", UInt16(kVK_UpArrow): "↑", UInt16(kVK_DownArrow): "↓",
+            UInt16(kVK_Home): "↖", UInt16(kVK_End): "↘", UInt16(kVK_PageUp): "⇞", UInt16(kVK_PageDown): "⇟",
+            UInt16(kVK_F1): "F1", UInt16(kVK_F2): "F2", UInt16(kVK_F3): "F3", UInt16(kVK_F4): "F4",
+            UInt16(kVK_F5): "F5", UInt16(kVK_F6): "F6", UInt16(kVK_F7): "F7", UInt16(kVK_F8): "F8",
+            UInt16(kVK_F9): "F9", UInt16(kVK_F10): "F10", UInt16(kVK_F11): "F11", UInt16(kVK_F12): "F12",
+            UInt16(kVK_F13): "F13", UInt16(kVK_F14): "F14", UInt16(kVK_F15): "F15", UInt16(kVK_F16): "F16",
+            UInt16(kVK_F17): "F17", UInt16(kVK_F18): "F18", UInt16(kVK_F19): "F19", UInt16(kVK_F20): "F20"
+        ]
+        let raw = (event.charactersIgnoringModifiers ?? "").unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }
+        let printable = String(String.UnicodeScalarView(raw)).prefix(1).uppercased()
+        let keyLabel = special[event.keyCode] ?? PVShortcutInput.latinLabel(code: event.keyCode, fallback: printable.isEmpty ? "Key \(event.keyCode)" : printable)
+        apply(SavedShortcut(keyCode: UInt32(event.keyCode), modifiers: modifiers, keyLabel: keyLabel))
+    }
+}
+
+private struct ShortcutCaptureView: NSViewRepresentable {
+    let onKey: (NSEvent) -> Void
+    func makeNSView(context: Context) -> ShortcutCaptureNSView {
+        let view = ShortcutCaptureNSView()
+        view.onKey = onKey
+        view.setAccessibilityLabel(PVL("Нажмите новое сочетание клавиш. Escape — отменить."))
+        view.setAccessibilityRole(.textField)
+        return view
+    }
+    func updateNSView(_ nsView: ShortcutCaptureNSView, context: Context) { nsView.onKey = onKey }
+}
+
+private final class ShortcutCaptureNSView: NSView {
+    var onKey: (NSEvent) -> Void = { _ in }
+    override var acceptsFirstResponder: Bool { true }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.window?.makeFirstResponder(self)
+        }
+    }
+    override func mouseDown(with event: NSEvent) { window?.makeFirstResponder(self) }
+    override func keyDown(with event: NSEvent) { onKey(event) }
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard window?.firstResponder === self else { return false }
+        onKey(event)
+        return true
+    }
+}
+
+nonisolated enum AppRelease {
+    static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "4.5" }
+    static var build: String { Bundle.main.infoDictionary?["PVBuildNumber"] as? String ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1" }
+    static var label: String { version + " · Build " + build }
+    static let author = "pewakkk"
+}
+
+nonisolated enum PVBrand {
+    struct Variant: Sendable {
+        let id: String
+        let asset: String
+        let title: String
+    }
+    static let variants = [
+        Variant(id: "pearl", asset: "PVPearl", title: PVL("Чёрный на белом")),
+        Variant(id: "graphite", asset: "PVGraphite", title: PVL("Белый на чёрном")),
+        Variant(id: "color3", asset: "PVColor3", title: "Color 3"),
+        Variant(id: "color", asset: "PVColor", title: "Color"),
+        Variant(id: "color2", asset: "PVColor2", title: "Color 2"),
+        Variant(id: "signature-dark", asset: "PVSignatureDark", title: PVL("Индиго")),
+        Variant(id: "signature-light", asset: "PVSignatureLight", title: PVL("Лаванда"))
+    ]
+    static func asset(for variant: String) -> String {
+        variants.first(where: { $0.id == variant })?.asset ?? "PVColor3"
+    }
+    @MainActor static func applySelectedIcon(allowIconAccessPrompt: Bool = false) {
+        let variant = UserDefaults.standard.string(forKey: "logoVariant") ?? "signature-dark"
+        let selected = PVUserLogoLibrary.shared.image(for: variant)
+        NSApp.applicationIconImage = selected ?? NSImage(named: NSImage.Name("PVSignatureDark"))
+        // An unavailable custom file must not replace an existing Finder icon with a fallback.
+        if let selected { PVFileIconStore.shared.apply(selected, allowPrompt: allowIconAccessPrompt) }
+    }
+}
+
+/// Only this background subtree ticks; it pauses whenever the save window is hidden.
+private struct PVAnimatedBackdrop: View {
+    let active: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !active || reduceMotion)) { context in
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
+            ZStack {
+                Color(red: 0.09, green: 0.075, blue: 0.22)
+                RadialGradient(colors: [Color(red: 0.395, green: 0.24, blue: 0.57), .clear],
+                               center: UnitPoint(x: 0.50 + sin(t * 0.12) * 0.035, y: 0.46 + cos(t * 0.09) * 0.035),
+                               startRadius: 0, endRadius: 370)
+            }
+        }.allowsHitTesting(false)
+    }
+}
+
+private struct PVHeroArtwork: View {
+    let asset: String
+    let active: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hovered = false
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !active || reduceMotion)) { context in
+            let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
+            ZStack {
+                Ellipse()
+                    .fill(Color(red: 0.36, green: 0.65, blue: 0.86).opacity(colorScheme == .dark ? 0.22 : 0.10))
+                    .frame(width: hovered ? 115 : 95, height: 40).blur(radius: 20).offset(y: 36)
+                Image(asset).resizable().scaledToFit().frame(width: 134, height: 134)
+                    .id(asset).transition(.opacity)
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.13), radius: hovered ? 17 : 12, y: hovered ? 13 : 8)
+                    .offset(y: reduceMotion ? 0 : sin(t * 0.65) * 2.4)
+                    .rotationEffect(.degrees(reduceMotion ? 0 : sin(t * 0.35) * 0.7))
+                    .rotation3DEffect(.degrees(reduceMotion ? 0 : hovered ? 7 : sin(t * 0.30) * 1.2), axis: (x: 0.3, y: 1, z: 0), perspective: 0.5)
+                    .scaleEffect(reduceMotion ? 1 : hovered ? 1.045 : 1)
+            }
+        }
+        .onHover { hovered = $0 }
+        .onChange(of: active) { _, active in if !active { hovered = false } }
+        .animation(reduceMotion ? nil : .spring(response: 0.5, dampingFraction: 0.8), value: hovered)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: asset)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct PVHelpView: View {
+    let replayWelcome: () -> Void
+    let checkUpdates: () -> Void
+    @EnvironmentObject private var hotKey: GlobalSaveHotKey
+    @Environment(\.colorScheme) private var colorScheme
+    private var theme: PVTheme { PVTheme(dark: true) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 11) {
+                Button(action: replayWelcome) {
+                    PVHeaderMark(tint: theme.muted).scaleEffect(1.5).frame(width: 42, height: 42)
+                }.buttonStyle(.plain).accessibilityLabel(PVL("Посмотреть приветствие"))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Premiere Versions").font(.system(size: 17, weight: .semibold, design: .rounded))
+                    Text(PVL("Версия ") + AppRelease.version + " · Build " + AppRelease.build)
+                        .font(.system(size: 11, design: .monospaced)).foregroundStyle(theme.muted)
+                }
+            }
+            Divider().overlay(theme.border)
+            section(PVL("Первый запуск"), PVL("Обычный запуск и клик по Dock открывают окно поверх других окон. После установки или обновления появляется приветствие. Сочетание работает только когда Premiere Pro — активное приложение. Enter или прокрутка вниз открывают главный экран. Панели открываются только наведением и закрываются при уходе мыши. Настройки из Check updates и редактор логотипа открываются в центре окна. В настройках можно включить монохромный значок строки меню: нажатие открывает программу, правое нажатие — меню выхода. Esc закрывает панель, возвращает к версии или скрывает главное окно в фон."))
+            section(PVL("Сохранение"), PVL("Версия → Enter → комментарий → Enter. Прокрутка вниз открывает комментарий, вверх возвращает к версии. Возврат также — ← version или Esc. Комментарий необязателен. Копируется файл на диске: сначала сохрани изменения в Premiere. Ручные версии автоматически не удаляются. Кнопки press return работают и мышью."))
+            section(PVL("Резервные копии"), PVL("Проверка раз в \(Int(BackupPolicy.checkInterval)) с; файл должен быть стабилен \(Int(BackupPolicy.stableDelay)) с. Файлы и папки с autosave / auto-save / auto save, готовые автосейвы Premiere и наши архивы пропускаются. Имя содержит статус recent/hourly/daily, местную дату изменения проекта и окончание autosave."))
+            section(PVL("Хранение"), PVL("recent — \(BackupPolicy.recentCount) последних; hourly — почасовые за \(BackupPolicy.hourlyHours) часов; daily — дневные за \(BackupPolicy.dailyDays) дней. После новой копии обновляются статусы и удаляются лишние файлы только в резервном архиве."))
+            section(PVL("Доступ и фон"), PVL("Поиск — на разрешённых дисках или в выбранной папке. Статус внизу открывает только резервное копирование; шестерёнка — настройки: папки, значки, затем тот же блок копирования. Изменения синхронизированы. Закрытие — Esc или нажатие снаружи. Программа работает до полного выхода; автозапуска пока нет."))
+            section(PVL("Выбор проекта"), PVL("Если проект не выбран или недоступен, выбери файл на отдельном экране. После выбора Enter или прокрутка вниз открывают версию. Название проекта со стрелкой вверх возвращает к выбору; прокрутка вверх с версии туда не ведёт. Удалённый проект больше не считается активным."))
+            section(PVL("Настройки и обновления"), PVL("Прокрутка настроек сохраняется на 10 секунд после закрытия. Значок Dock можно скрыть, сохранив доступ через строку меню. Проверки обновлений идут в фоне при запуске и раз в 6 часов; коралловая точка сообщает о новой версии. Установка остаётся ручной."))
+            section(PVL("Клавиши и логотип"), PVL("Сейчас: \(hotKey.shortcut.display). Сочетание работает в активном Premiere Pro. При записи используется английская раскладка, прежняя возвращается после завершения. Наведение открывает настройки; запись начинается отдельным нажатием. Встроенные логотипы находятся в приложении. Выбор Dock и два пользовательских варианта сохраняются между версиями. Выбранный значок сохраняется и для закрытого приложения после разрешения доступа к папке программы. При обновлении он применяется к запущенной новой версии, старые архивные приложения не меняются."))
+            Divider().overlay(theme.border)
+            Button(PVL("Проверить обновления"), action: checkUpdates).buttonStyle(PVQuietButtonStyle())
+        }
+        .padding(18).frame(maxWidth: .infinity)
+        .foregroundStyle(theme.ink).background(theme.panel)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func section(_ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.system(size: 12, weight: .semibold))
+            Text(text).font(.system(size: 11)).foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct PVFloatingSurface: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    func body(content: Content) -> some View {
+        content
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(PVTheme(dark: colorScheme == .dark).border) }
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.32 : 0.13), radius: 24, y: 8)
+    }
+}
+
+private struct PVFooterHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 50
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}

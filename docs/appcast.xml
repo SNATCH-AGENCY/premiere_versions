@@ -1,0 +1,16 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Premiere Versions</title>
+        <item>
+            <title>4.4</title>
+            <pubDate>Mon, 02 Nov 2026 13:59:01 +0300</pubDate>
+            <link>https://github.com/pewakkk/premiere_versions</link>
+            <sparkle:version>4.4.2</sparkle:version>
+            <sparkle:shortVersionString>4.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.6.2</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/pewakkk/premiere_versions/releases/download/v4.4-build2/Premiere-Versions-4.4-Build-2.zip" length="7159657" type="application/octet-stream" sparkle:edSignature="FqRYkqt2UKfBWvpETWDl5C9/nZvl1gHT+Ch/MkidmOTsgqZWKDnIrC0vHhA4c1JJ8Hqt3gfxytern80+V65PBw=="/>
+        </item>
+    </channel>
+</rss>

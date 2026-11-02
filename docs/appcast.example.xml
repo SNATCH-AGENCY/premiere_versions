@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Example only. Publish appcast.xml only after a signed archive is available. -->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Premiere Versions</title>
+    <!-- Populate items with the official Sparkle generate_appcast tool. -->
+  </channel>
+</rss>

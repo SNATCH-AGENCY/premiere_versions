@@ -1,0 +1,40 @@
+# Build products and local Xcode state
+.DS_Store
+Icon?
+DerivedData/
+build/
+.build/
+*.app/
+*.dSYM/
+*.xcarchive/
+xcuserdata/
+*.xcuserstate
+*.log
+
+# Private configuration and credentials
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.pem
+*.key
+*.mobileprovision
+private/
+secrets/
+
+# Local archives, user logo history and project data
+old versions/
+usercolor.png
+userprevcolor.png
+*.prproj
+Premiere_Saves/
+Premiere_AutoSaves/
+
+*.before-sparkle
+
+
+Vendor/
+__pycache__/
+*.py[cod]
+
