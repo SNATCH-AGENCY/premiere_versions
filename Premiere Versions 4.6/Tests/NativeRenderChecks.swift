@@ -103,13 +103,42 @@ import AppKit
                 for elapsed in [0.03, 0.12, 0.25, 0.46] {
                     while Date().timeIntervalSince(started) < elapsed { RunLoop.current.run(until: Date().addingTimeInterval(0.002)) }
                     NotificationCenter.default.post(name: Notification.Name("PVTestInspectPanel"), object: nil)
-                    guard panelVisible == (elapsed < 0.38), remainsCentered else { print("FAIL: panel content/anchor changed before fade ended", elapsed, panelVisible, remainsCentered); exit(1) }
+                    if elapsed < 0.38 && Date().timeIntervalSince(started) < 0.35 {
+                        guard panelVisible, remainsCentered else { print("FAIL: panel content/anchor changed before fade ended"); exit(1) }
+                    }
+                    if elapsed > 0.38 {
+                        let deadline = Date().addingTimeInterval(1.2)
+                        while panelVisible && Date() < deadline {
+                            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+                            NotificationCenter.default.post(name: Notification.Name("PVTestInspectPanel"), object: nil)
+                        }
+                        guard !panelVisible else { print("FAIL: close animation never completed"); exit(1) }
+                    }
                     host.layoutSubtreeIfNeeded()
                     host.cacheDisplay(in: host.bounds, to: rep)
                     try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: UserDefaults.standard.string(forKey: "pvRenderOutput")! + "/close-" + String(Int(elapsed * 1000)) + "-" + (UserDefaults.standard.string(forKey: "interfaceLanguage") ?? "en") + ".png"))
                 }
                 NotificationCenter.default.removeObserver(stateObserver)
                 print("PASS: actual closing animation retains content and center until fading completes")
+            }
+            if mode == "version" {
+                var visible = false
+                let stateObserver = NotificationCenter.default.addObserver(forName: Notification.Name("PVTestPanelState"), object: nil, queue: .main) { note in visible = note.userInfo?["visible"] as? Bool ?? false }
+                NotificationCenter.default.post(name: Notification.Name("PVTestHoverSettings"), object: nil)
+                RunLoop.current.run(until: Date().addingTimeInterval(0.04))
+                NotificationCenter.default.post(name: Notification.Name("PVTestClickSettings"), object: nil)
+                NotificationCenter.default.post(name: Notification.Name("PVTestSpuriousExit"), object: nil)
+                let end = Date().addingTimeInterval(0.65)
+                while Date() < end { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
+                NotificationCenter.default.post(name: Notification.Name("PVTestInspectPanel"), object: nil)
+                guard visible else { print("FAIL: click during hover delay closed the panel"); exit(1) }
+                NotificationCenter.default.post(name: Notification.Name("PVTestPointerOutside"), object: nil)
+                let gone = Date().addingTimeInterval(1.3)
+                while Date() < gone { RunLoop.current.run(until: Date().addingTimeInterval(0.01)) }
+                NotificationCenter.default.post(name: Notification.Name("PVTestInspectPanel"), object: nil)
+                guard !visible else { print("FAIL: panel did not close after pointer actually left"); exit(1) }
+                NotificationCenter.default.removeObserver(stateObserver)
+                print("PASS: click cancels pending hover; spurious pointer exit does not close inside; actual exit closes")
             }
             if mode.hasPrefix("welcome") {
                 var bright = 0

@@ -43,6 +43,7 @@ struct ContentView: View {
     @State private var updateScrollRequest = 0
     @StateObject private var updates = PVUpdateService.shared
     @AppStorage("interfaceLanguage") private var interfaceLanguage = "en"
+    @State private var hoverRequest = 0
     @State private var hoverIntent: Panel?
     @State private var hoverTask: Task<Void, Never>?
     private var showingSettings: Bool {
@@ -74,6 +75,7 @@ struct ContentView: View {
     @State private var missingProjectName = ""
     @StateObject private var projectWatcher = PVProjectWatcher()
     @StateObject private var settingsScroll = PVScrollMemory()
+    @StateObject private var manualVersions = PVManualVersionIndex()
     @State private var stageFocusTask: Task<Void, Never>?
     @AppStorage("logoVariant") private var logoVariant = "signature-dark"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -220,6 +222,7 @@ struct ContentView: View {
             versionNumber = suggestedVersionNumber() ?? versionNumber
             if !showingLogoEditor { restoreVersionFocus() }
         }
+        .onChange(of: archivePath) { _, _ in refreshArchivedVersionNumbers() }
         .onChange(of: projectWatcher.revision) { _, _ in refreshProjectSelection() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             if didRestore, NSApp.keyWindow is PVUtilityWindow { refreshProjectSelection() }
@@ -380,23 +383,33 @@ struct ContentView: View {
         }
     }
 
+    private func openPanelImmediately(_ panel: Panel) {
+        hoverRequest &+= 1
+        hoverTask?.cancel(); hoverIntent = nil
+        panelCloseTask?.cancel()
+        guard activePanel != panel || panelClosing else { return }
+        openPanel(panel, pinned: false)
+    }
+
     private func schedulePanel(_ panel: Panel, hovering: Bool) {
         if !hovering {
-            if hoverIntent == panel { hoverTask?.cancel(); hoverIntent = nil }
+            if hoverIntent == panel { hoverRequest &+= 1; hoverTask?.cancel(); hoverIntent = nil }
             return
         }
-        guard !showingWelcome, !welcomeTransitioning else { return }
+        guard !showingWelcome, !welcomeTransitioning, activePanel != panel else { return }
         hoverTask?.cancel()
+        hoverRequest &+= 1
+        let request = hoverRequest
         hoverIntent = panel
         hoverTask = Task { @MainActor in
             do { try await Task.sleep(nanoseconds: 300_000_000) } catch { return }
-            guard hoverIntent == panel, !showingWelcome, !welcomeTransitioning else { return }
+            guard !Task.isCancelled, request == hoverRequest, hoverIntent == panel,
+                  !showingWelcome, !welcomeTransitioning else { return }
             openPanel(panel, pinned: false)
         }
     }
 
-    private func panelPosition(for panel: Panel, in size: CGSize) -> CGPoint {
-        if panelCentered { return CGPoint(x: size.width / 2, y: size.height / 2) }
+    private func panelDimensions(_ panel: Panel, in size: CGSize) -> CGSize {
         let dimensions: CGSize
         let available = size.height - 32
         switch panel {
@@ -406,16 +419,33 @@ struct ContentView: View {
         case .shortcut: dimensions = CGSize(width: 340, height: min(310, available))
         case .logoEditor: dimensions = CGSize(width: 470, height: min(420, available))
         }
+        return dimensions
+    }
+
+    private func panelPosition(for panel: Panel, in size: CGSize) -> CGPoint {
+        if panelCentered { return CGPoint(x: size.width / 2, y: size.height / 2) }
+        let dimensions = panelDimensions(panel, in: size)
         let half = CGSize(width: dimensions.width / 2, height: dimensions.height / 2)
         return CGPoint(x: min(max(panelAnchor.x, half.width + 16), size.width - half.width - 16),
                        y: min(max(panelAnchor.y, half.height + 16), size.height - half.height - 16))
+    }
+
+    private func pointerIsInsidePanel(_ panel: Panel) -> Bool {
+        guard let window = NSApp.keyWindow, let content = window.contentView else { return false }
+        let point = content.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        let local = CGPoint(x: point.x, y: content.isFlipped ? point.y : content.bounds.height - point.y)
+        let size = content.bounds.size
+        let center = panelPosition(for: panel, in: size)
+        let dimensions = panelDimensions(panel, in: size)
+        return CGRect(x: center.x - dimensions.width / 2, y: center.y - dimensions.height / 2,
+                      width: dimensions.width, height: dimensions.height).contains(local)
     }
 
     private func schedulePanelClose(_ panel: Panel) {
         panelCloseTask?.cancel()
         panelCloseTask = Task { @MainActor in
             do { try await Task.sleep(nanoseconds: 160_000_000) } catch { return }
-            if !panelPinned && activePanel == panel && !panelClosing { dismissPanel() }
+            if !Task.isCancelled, !panelPinned, activePanel == panel, !panelClosing, !pointerIsInsidePanel(panel) { dismissPanel() }
         }
     }
 
@@ -488,14 +518,14 @@ struct ContentView: View {
                 .accessibilityLabel(PVL("Информация: ") + AppRelease.label)
                 .accessibilityAction { openPanel(.help, centered: true) }
                 .onHover { schedulePanel(.help, hovering: $0) }
-                    .onTapGesture { openPanel(.help, pinned: false) }
+                    .onTapGesture { openPanelImmediately(.help) }
             Image(systemName: "gearshape")
                 .overlay(alignment: .topTrailing) { if updates.available != nil { Circle().fill(Color(red: 0.85, green: 0.43, blue: 0.47)).frame(width: 5, height: 5).offset(x: 4, y: -2) } }
                 .padding(.leading, 14).frame(width: 24, height: 28).contentShape(Rectangle())
                 .help(PVL("Настройки")).accessibilityLabel(PVL("Настройки"))
                 .accessibilityAction { openPanel(.settings, centered: true) }
                 .onHover { schedulePanel(.settings, hovering: $0) }
-                    .onTapGesture { openPanel(.settings, pinned: false) }
+                    .onTapGesture { openPanelImmediately(.settings) }
 
         }
         .foregroundStyle(theme.muted)
@@ -776,6 +806,8 @@ struct ContentView: View {
                             .font(.system(size: 11)).foregroundStyle(theme.muted)
                     }
                 }
+                Text(PVL("Новые проекты: последние 48 ч · работает без интернета"))
+                    .font(.system(size: 10)).foregroundStyle(theme.muted)
                 Text(PVL(autosaveMonitor.status))
                     .font(.system(size: 11)).foregroundStyle(theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -985,7 +1017,7 @@ struct ContentView: View {
                     .font(.system(size: 11, weight: .regular))
                     .contentShape(Rectangle())
                     .onHover { schedulePanel(.backups, hovering: $0) }
-                    .onTapGesture { openPanel(.backups, pinned: false) }
+                    .onTapGesture { openPanelImmediately(.backups) }
                     .accessibilityAction { openPanel(.backups, centered: true) }
                     .help(PVL(autosaveMonitor.status) + PVL("\nНаведи, чтобы открыть резервное копирование"))
                 Spacer()
@@ -993,7 +1025,7 @@ struct ContentView: View {
                     .contentShape(Rectangle()).help(PVL("Изменить сочетание клавиш"))
                     .accessibilityAction { openPanel(.shortcut, centered: true) }
                     .onHover { schedulePanel(.shortcut, hovering: $0) }
-                    .onTapGesture { openPanel(.shortcut, pinned: false) }
+                    .onTapGesture { openPanelImmediately(.shortcut) }
 
             }
         }
@@ -1077,12 +1109,14 @@ struct ContentView: View {
             UserDefaults.standard.set(url.lastPathComponent, forKey: "lastProjectName")
             missingProjectName = ""
             projectName = url.deletingPathExtension().lastPathComponent
+            refreshArchivedVersionNumbers()
             versionNumber = suggestedVersionNumber() ?? "v001"
             statusMessage = PVL("Последний проект восстановлен")
             isError = false
         } catch {
             missingProjectName = projectName.isEmpty ? (UserDefaults.standard.string(forKey: "lastProjectName") ?? "") : projectName
             sourceProjectURL = nil
+            manualVersions.invalidate()
             projectName = ""
             statusMessage = PVL("Выбери проект Premiere")
             isError = false
@@ -1124,11 +1158,13 @@ struct ContentView: View {
             commentStage = false
             versionComment = ""
             projectName = url.deletingPathExtension().lastPathComponent
+            refreshArchivedVersionNumbers()
             versionNumber = suggestedVersionNumber() ?? "v001"
             statusMessage = PVL("Проект выбран и сохранён для следующего запуска")
             isError = false
         } catch {
             sourceProjectURL = nil
+            manualVersions.invalidate()
             projectName = ""
             statusMessage = PVL("Не удалось сохранить доступ к проекту: \(error.localizedDescription)")
             isError = true
@@ -1276,28 +1312,16 @@ struct ContentView: View {
         return String(format: "v%03d", (versions.max() ?? 0) + 1)
     }
 
-    /// Both labels use the same archive numbering, including manually entered versions.
-    private func archivedVersionNumbers() -> [Int]? {
-        guard !projectName.isEmpty else { return nil }
+    /// Display reads are memory-only; refresh explicitly after selecting or saving.
+    private func archivedVersionNumbers() -> [Int]? { manualVersions.numbers }
+
+    private func refreshArchivedVersionNumbers() {
+        guard !projectName.isEmpty else { manualVersions.invalidate(); return }
         do {
-            return try withArchiveAccess { archiveURL in
-                let folder = archiveURL.appendingPathComponent(projectName, isDirectory: true)
-                guard fileManager.fileExists(atPath: folder.path) else { return [] }
-                let files = try fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-                let prefix = NSRegularExpression.escapedPattern(for: projectName)
-                let regex = try NSRegularExpression(pattern: "(?i)^" + prefix + #"_v(\d+)(?:_|\.|$)"#)
-                return files.compactMap { file in
-                    guard file.pathExtension.lowercased() == "prproj" else { return nil }
-                    let name = file.lastPathComponent
-                    let range = NSRange(name.startIndex..<name.endIndex, in: name)
-                    guard let match = regex.firstMatch(in: name, range: range),
-                          let numberRange = Range(match.range(at: 1), in: name) else { return nil }
-                    return Int(name[numberRange])
-                }
+            try withArchiveAccess { archiveURL in
+                try manualVersions.refresh(project: projectName, archive: archiveURL)
             }
-        } catch {
-            return nil
-        }
+        } catch { manualVersions.invalidate() }
     }
 
     // MARK: - Save version
@@ -1357,6 +1381,7 @@ struct ContentView: View {
                     isError = false
                     versionComment = ""
 
+                    refreshArchivedVersionNumbers()
                     versionNumber = suggestedVersionNumber() ?? versionNumber
                     // Hide the window; keep the shortcut and autosave service running.
                     NSApp.hide(nil)
@@ -1558,7 +1583,7 @@ private final class ShortcutCaptureNSView: NSView {
 
 nonisolated enum AppRelease {
     static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "4.6" }
-    static var build: String { Bundle.main.infoDictionary?["PVBuildNumber"] as? String ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1" }
+    static var build: String { Bundle.main.infoDictionary?["PVBuildNumber"] as? String ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "2" }
     static var label: String { version + " · Build " + build }
     static let author = "pewakkk"
 }
@@ -1660,6 +1685,7 @@ private struct PVHelpView: View {
             section(PVL("Первый запуск"), PVL("Обычный запуск и клик по Dock открывают окно поверх других окон. После установки или обновления появляется приветствие. Сочетание работает только когда Premiere Pro — активное приложение. Enter или прокрутка вниз открывают главный экран. Панели открываются наведением или сразу по нажатию и закрываются при уходе мыши. Настройки из Check updates и редактор логотипа открываются в центре окна. В настройках можно включить монохромный значок строки меню: нажатие открывает программу, правое нажатие — меню выхода. Esc закрывает панель, возвращает к версии или скрывает главное окно в фон."))
             section(PVL("Сохранение"), PVL("Версия → Enter → комментарий → Enter. Прокрутка вниз открывает комментарий, вверх возвращает к версии. Возврат также — ← version или Esc. Комментарий необязателен. Копируется файл на диске: сначала сохрани изменения в Premiere. Ручные версии автоматически не удаляются. Кнопки press return работают и мышью."))
             section(PVL("Резервные копии"), PVL("Проверка раз в \(Int(BackupPolicy.checkInterval)) с; файл должен быть стабилен \(Int(BackupPolicy.stableDelay)) с. Файлы и папки с autosave / auto-save / auto save, готовые автосейвы Premiere и наши архивы пропускаются. Имя содержит статус recent/hourly/daily, местную дату изменения проекта и окончание autosave."))
+            section(PVL("Новые проекты"), PVL("Автоматический поиск начинает копирование проектов, созданных за последние \(BackupPolicy.newProjectHours) часов. Считается дата создания файла, а не его последнего изменения. Для уже принятых под наблюдение проектов копирование продолжается и позже. Старые файлы не создают новые папки. Поиск и копирование работают без интернета; при следующей проверке находятся и проекты, созданные в отсутствие связи. Исходные файлы и прежние копии не удаляются."))
             section(PVL("Хранение"), PVL("recent — \(BackupPolicy.recentCount) последних; hourly — почасовые за \(BackupPolicy.hourlyHours) часов; daily — дневные за \(BackupPolicy.dailyDays) дней. После новой копии обновляются статусы и удаляются лишние файлы только в резервном архиве."))
             section(PVL("Доступ и фон"), PVL("Поиск — на разрешённых дисках или в выбранной папке. Статус внизу открывает только резервное копирование; шестерёнка — настройки: папки, значки, затем тот же блок копирования. Изменения синхронизированы. Закрытие — Esc или нажатие снаружи. Программа работает до полного выхода; автозапуска пока нет."))
             section(PVL("Выбор проекта"), PVL("Если проект не выбран или недоступен, выбери файл на отдельном экране. После выбора Enter или прокрутка вниз открывают версию. Название проекта со стрелкой вверх возвращает к выбору; прокрутка вверх с версии туда не ведёт. Удалённый проект больше не считается активным."))

@@ -688,10 +688,6 @@
     "en": "Press a new keyboard shortcut. Escape cancels."
   },
   {
-    "ru": "Совместно с Codex",
-    "en": "Together with Codex"
-  },
-  {
     "ru": "Чёрный на белом",
     "en": "Black on white"
   },
@@ -890,5 +886,21 @@
   {
     "ru": "В настройках можно менять плотность фона от 15% до 100%. При уменьшении за окном остаётся матовое размытие, текст и кнопки сохраняют читаемость. Выбор запоминается. При включённом уменьшении прозрачности в macOS используется непрозрачный фон.",
     "en": "Settings can adjust background opacity from 15% to 100%. Lower values reveal a frosted backdrop while text and controls remain readable. Your choice is remembered. macOS Reduce Transparency keeps the background opaque."
+  },
+  {
+    "ru": " · вне окна 48 ч: %@",
+    "en": " · outside 48h window: %@"
+  },
+  {
+    "ru": "Новые проекты",
+    "en": "New projects"
+  },
+  {
+    "ru": "Новые проекты: последние 48 ч · работает без интернета",
+    "en": "New projects: last 48h · works offline"
+  },
+  {
+    "ru": "Автоматический поиск начинает копирование проектов, созданных за последние %@ часов. Считается дата создания файла, а не его последнего изменения. Для уже принятых под наблюдение проектов копирование продолжается и позже. Старые файлы не создают новые папки. Поиск и копирование работают без интернета; при следующей проверке находятся и проекты, созданные в отсутствие связи. Исходные файлы и прежние копии не удаляются.",
+    "en": "Automatic discovery starts backing up projects created in the last %@ hours, using file creation time rather than last modification time. Enrolled projects continue to be backed up afterwards. Older files do not create new folders. Discovery and copying work offline; the next scan can find projects created without a connection. Original files and existing backups are not deleted."
   }
 ]

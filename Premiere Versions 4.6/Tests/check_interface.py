@@ -11,6 +11,10 @@ for p in (root/'Premiere Versions').glob('*.swift'):
         a=s.index('    init() {',s.index('final class AutosaveMonitor'));b=s.index('    func start()',a)
         s=s[:a]+'    init() {}\n\n'+s[b:]
     if p.name=='ContentView.swift':
+        s=s.replace('struct ContentView: View {', 'struct ContentView: View {\n    @State private var pvTestPointerInside = true')
+        a=s.index('    private func pointerIsInsidePanel(');b=s.index('    private func schedulePanelClose(',a)
+        s=s[:a]+'    private func pointerIsInsidePanel(_ panel: Panel) -> Bool { pvTestPointerInside }\n\n'+s[b:]
+        s=s.replace('        .onChange(of: logoVariant) {', '        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestHoverSettings"))) { _ in schedulePanel(.settings, hovering: true) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestClickSettings"))) { _ in openPanelImmediately(.settings) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestSpuriousExit"))) { _ in schedulePanelClose(.settings) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestPointerOutside"))) { _ in pvTestPointerInside = false; schedulePanelClose(.settings) }\n        .onChange(of: logoVariant) {')
         s=s.replace('        .onChange(of: logoVariant) {', '        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestDismissPanel"))) { _ in dismissPanel() }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestInspectPanel"))) { _ in\n            NotificationCenter.default.post(name: Notification.Name("PVTestPanelState"), object: nil, userInfo: ["visible": activePanel != nil, "centered": panelCentered])\n        }\n        .onChange(of: logoVariant) {')
         s=s.replace('struct ContentView: View {','''struct ContentView: View {
     init(previewPanel: String = "version") {

@@ -9,7 +9,7 @@ Its purpose is simple: **help protect important edits with deliberate version sa
 ## A safety net for your projects
 
 - **Save important milestones.** Keep a numbered copy before a major change, a client revision or a new direction. Add a short comment so you remember what changed.
-- **Keep backups in the background.** While the app is running and backup monitoring is enabled, it watches saved project files and keeps recent, hourly and daily checkpoints.
+- **Keep backups in the background.** While the app is running and backup monitoring is enabled, it discovers projects created within the last 48 hours and keeps recent, hourly and daily checkpoints. Enrolled projects remain protected after that window.
 - **Find your way back.** Manual versions have readable names and comments; backup names include the project, checkpoint type and time.
 - **Keep your archive manageable.** Older automatic backups rotate. Your manual versions stay until you decide to remove them. Original project files and Premiere’s own Auto-Saves are left untouched.
 
@@ -21,6 +21,12 @@ Its purpose is simple: **help protect important edits with deliberate version sa
 4. With Premiere Pro active, press **Option+S**, choose a version number, then press Return. Add an optional comment and press Return again to keep the copy.
 
 The shortcut can be changed in Settings. You can also open the utility from the Dock or enable its optional menu bar icon.
+
+## Which projects get automatic backups?
+
+New automatic discovery uses the **file creation date within the last 48 hours**, not the last edit date. Older unrelated projects do not create new archive folders. If creation time is unavailable, an untracked file is skipped. Projects already enrolled, including existing managed backup archives, continue to be backed up afterwards.
+
+**No internet connection is needed for project discovery or copying.** The next scan can find projects created during an offline period, as long as they are still within the 48-hour window. The app must be running to monitor changes. Manual numbered saves remain available for projects of any age.
 
 ## What is protected?
 
@@ -34,11 +40,12 @@ Choose English or Russian, your save locations and a built-in or custom icon. Yo
 
 The app quietly checks for updates at launch and every six hours. Use **Check updates** in Settings any time; you choose when to install. You can hide the Dock icon and keep the app in the menu bar instead.
 
-## What’s new in 4.6
+## Latest improvements
 
-- **A frosted background, your way.** Adjust background opacity from 15% to 100%, with clear text and controls. Your choice is remembered.
-- **Quicker navigation.** A larger project control and immediate click access to helper panels, alongside hover.
-- **Smoother transitions.** Panels dissolve with blur and opacity, without a dark overlay.
+- **A quieter backup archive.** Automatic discovery starts with projects created within 48 hours; enrolled projects stay protected afterwards. Backups and discovery work offline.
+- **Less disk activity.** Version history is cached between explicit refreshes instead of being reread during typing and animations.
+- **More reliable controls.** Clicking during a hover delay opens the panel immediately and avoids accidental dismissal.
+- General interface cleanup and stricter release privacy checks.
 
 ## Your work stays yours
 

@@ -490,7 +490,7 @@ final class AutosaveMonitor: ObservableObject {
             let message: String
             do {
                 let result = try worker.scanAutosaves(cancellation: cancellation)
-                message = PVL("Найдено: \(result.found) · скопировано: \(result.copied) · уже в архиве: \(result.unchanged) · ожидают стабильности: \(result.waiting)") + (result.inaccessible == 0 ? "" : PVL(" · нет доступа к папкам: \(result.inaccessible)"))
+                message = PVL("Найдено: \(result.found) · скопировано: \(result.copied) · уже в архиве: \(result.unchanged) · ожидают стабильности: \(result.waiting)") + (result.outsideCreationWindow == 0 ? "" : PVL(" · вне окна 48 ч: \(result.outsideCreationWindow)")) + (result.inaccessible == 0 ? "" : PVL(" · нет доступа к папкам: \(result.inaccessible)"))
             } catch {
                 message = PVL("Ошибка мониторинга: \(error.localizedDescription)")
             }
@@ -552,6 +552,12 @@ nonisolated enum DefaultLocations {
 nonisolated enum BackupPolicy {
     static let checkInterval: TimeInterval = 30
     static let stableDelay: TimeInterval = 12
+    static let newProjectHours = 48
+    static func acceptsCreation(_ date: Date?, now: Date) -> Bool {
+        guard let date else { return false }
+        let age = now.timeIntervalSince(date)
+        return age >= -300 && age <= Double(newProjectHours) * 60 * 60
+    }
     static let recentCount = 10
     static let hourlyHours = 12
     static let dailyDays = 5
@@ -688,6 +694,7 @@ nonisolated struct AutosaveScanResult: Sendable {
     var unchanged = 0
     var waiting = 0
     var inaccessible = 0
+    var outsideCreationWindow = 0
 }
 
 /// All filesystem work runs on a serial utility queue, never on the UI thread.
@@ -723,7 +730,7 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
         do {
             try withScopedAccess(to: watchURL) {
                 try withScopedAccess(to: archiveURL) {
-                    let keys: Set<URLResourceKey> = [.isRegularFileKey, .contentModificationDateKey, .fileSizeKey]
+                    let keys: Set<URLResourceKey> = [.isRegularFileKey, .creationDateKey, .contentModificationDateKey, .fileSizeKey]
                     let watchPath = watchURL.resolvingSymlinksInPath().standardizedFileURL.path
                     let archivePath = archiveURL.resolvingSymlinksInPath().standardizedFileURL.path
                     guard watchPath != archivePath, !watchPath.hasPrefix(archivePath + "/") else {
@@ -746,14 +753,34 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
                             continue
                         }
 
+                        let projectName = source.deletingPathExtension().lastPathComponent
+                        let projectFolder = archiveURL.appendingPathComponent(projectName, isDirectory: true)
+                        let enrollment = projectFolder.appendingPathComponent(".pv-source.json")
+                        let canonicalSource = source.resolvingSymlinksInPath().standardizedFileURL.path
+                        let enrolledPath = (try? Data(contentsOf: enrollment)).flatMap { try? JSONDecoder().decode(String.self, from: $0) }
+                        var enrolled = enrolledPath == canonicalSource
+                        let fresh = BackupPolicy.acceptsCreation(values.creationDate, now: now)
+                        // Adopt an existing managed archive once; an explicit different source is never adopted.
+                        if !enrolled && !fresh && !fileManager.fileExists(atPath: enrollment.path),
+                           fileManager.fileExists(atPath: projectFolder.path) {
+                            archiveDirectoryReads += 1
+                            let existing = try fileManager.contentsOfDirectory(at: projectFolder, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])
+                            enrolled = existing.contains { file in
+                                BackupNaming.isManaged(file.lastPathComponent, project: projectName) &&
+                                (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+                            }
+                        }
+                        guard fresh || enrolled else {
+                            result.outsideCreationWindow += 1
+                            continue
+                        }
+
                         let cacheKey = archiveURL.path + "#" + source.path
                         if let cached = archivedSnapshots[cacheKey], cached.date == modified, cached.size == size,
                            fileManager.fileExists(atPath: cached.archive.path) {
                             result.unchanged += 1
                             continue
                         }
-                        let projectName = source.deletingPathExtension().lastPathComponent
-                        let projectFolder = archiveURL.appendingPathComponent(projectName, isDirectory: true)
                         try fileManager.createDirectory(
                             at: projectFolder,
                             withIntermediateDirectories: true
@@ -778,6 +805,10 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
                             try applyAutosaveRetention(in: projectFolder, now: now)
                         } else {
                             result.unchanged += 1
+                        }
+                        if enrolledPath != canonicalSource {
+                            let data = try JSONEncoder().encode(canonicalSource)
+                            try data.write(to: enrollment, options: .atomic)
                         }
                         if let kept = matchingSnapshot ?? (fileManager.fileExists(atPath: destination.path) ? destination : nil) {
                             archivedSnapshots[cacheKey] = (modified, size, kept)

@@ -1,3 +1,10 @@
+# 4.6 Build 2
+
+- Only newly discovered projects created within 48 hours start automatic backups; enrolled projects stay protected. Backups work offline.
+- Fix the hover/click race so clicking during the hover delay opens the panel immediately and keeps it open under the pointer.
+- Reduce repeated archive reads during typing, animations and appearance adjustments.
+- Remove obsolete interface resources and tighten release privacy checks.
+
 # 4.6 Build 1
 
 - Adjustable frosted background, with remembered opacity from 15% to 100% and full-strength text and controls.
@@ -45,5 +52,5 @@
 - Monitoring uptime uses days/hours/minutes with singular/plural forms.
 - Edit either selected custom icon in place without rotating the other history slot. New colors use an embedded RGB editor; no separate macOS color panel remains.
 - One update-check service backs Help and Settings. Help opens pinned Settings at Updates. Successful check timestamps are saved only after a valid server response; missing feeds/network failures are shown honestly.
-- Release feed URL prepared for pewakkk/premiere_versions. The verified official Sparkle 2.10.1 SDK and a Keychain-generated public update key are linked. Publication remains gated on signed artifacts and an actual two-build integration test.
+- Release feed URL prepared for the project repository. The verified official Sparkle 2.10.1 SDK and a Keychain-generated public update key are linked. Publication remains gated on signed artifacts and an actual two-build integration test.
 - Machine bundle build is 4.3.1; the UI remains 4.3 · Build 1. This keeps Sparkle comparisons monotonic while visible build numbers reset per version.
