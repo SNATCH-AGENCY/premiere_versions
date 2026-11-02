@@ -243,14 +243,19 @@ nonisolated final class PVBackupArchive {
         try JSONEncoder().encode(state).write(to: location(folder), options: .atomic)
         states[folder.path] = state
     }
-    func process(source: URL, folder: URL, now: Date, afterCopy: (() throws -> Void)? = nil) throws -> Outcome {
+    func latest(source: URL, folder: URL) throws -> PVLatestBackup? {
+        let state = try load(folder, project: source.deletingPathExtension().lastPathComponent)
+        guard let record = state.records.last else { return nil }
+        return PVLatestBackup(file: folder.appendingPathComponent(record.filename), captured: record.captured)
+    }
+    func process(source: URL, folder: URL, now: Date, forceSnapshot: Bool = false, afterCopy: (() throws -> Void)? = nil) throws -> Outcome {
         var state = try load(folder, project: source.deletingPathExtension().lastPathComponent)
         let previous = state
         let fingerprint = try PVSourceFingerprint.read(source)
         guard now.timeIntervalSince(fingerprint.modified) >= BackupPolicy.stableDelay else { return .waiting }
         let latest = state.records.last
         var outcome = Outcome.unchanged
-        let due = latest.map { now.timeIntervalSince($0.captured) >= BackupPolicy.snapshotInterval || now < $0.captured } ?? true
+        let due = forceSnapshot || latest.map { now.timeIntervalSince($0.captured) >= BackupPolicy.snapshotInterval || now < $0.captured } ?? true
         if latest == nil || state.observed == nil || (state.observed != fingerprint && due) {
             let staged = try PVSafeCopy.stage(source, in: folder, now: now, afterCopy: afterCopy)
             defer { try? fm.removeItem(at: staged.file) }
@@ -286,5 +291,41 @@ nonisolated final class PVBackupArchive {
             for record in expired { try fm.removeItem(at: folder.appendingPathComponent(record.filename)) }
         }
         return outcome
+    }
+}
+
+nonisolated struct PVLatestBackup: Sendable, Equatable {
+    let file: URL
+    let captured: Date
+}
+nonisolated enum PVBackupIssue: String, Sendable, Error, LocalizedError {
+    var errorDescription: String? { PVL(title) }
+    case sourceMissing, diskUnavailable, searchAccess, archiveAccess, writing, copyFailed
+    var title: String {
+        switch self {
+        case .sourceMissing: return "Проект не найден"
+        case .diskUnavailable: return "Диск отключён или недоступен"
+        case .searchAccess: return "Нужен доступ к проектам"
+        case .archiveAccess: return "Нет доступа к папке копий"
+        case .writing: return "Проект ещё сохраняется"
+        case .copyFailed: return "Не удалось создать копию"
+        }
+    }
+    static func classify(_ error: Error, project: URL?, archive: URL?) -> Self {
+        if disconnected(archive) || disconnected(project) { return .diskUnavailable }
+        if let known = error as? Self { return known }
+        let cocoa = error as NSError
+        if cocoa.domain == NSCocoaErrorDomain && [NSFileReadNoPermissionError, NSFileWriteNoPermissionError].contains(cocoa.code) {
+            return archive.map { !FileManager.default.isWritableFile(atPath: $0.path) } == true ? .archiveAccess : .searchAccess
+        }
+        if let project, !FileManager.default.fileExists(atPath: project.path) { return .sourceMissing }
+        if let archive, !FileManager.default.isWritableFile(atPath: archive.path) { return .archiveAccess }
+        return .copyFailed
+    }
+    static func disconnected(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        let parts = url.pathComponents
+        guard parts.count > 2, parts[1] == "Volumes" else { return false }
+        return !FileManager.default.fileExists(atPath: "/Volumes/" + parts[2])
     }
 }

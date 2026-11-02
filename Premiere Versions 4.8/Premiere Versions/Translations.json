@@ -986,5 +986,145 @@
   {
     "ru": "Не удалось изменить работу помощника: ",
     "en": "Could not change helper settings: "
+  },
+  {
+    "ru": "Режим",
+    "en": "Mode"
+  },
+  {
+    "ru": "Авто",
+    "en": "Auto"
+  },
+  {
+    "ru": "Всегда",
+    "en": "Always"
+  },
+  {
+    "ru": "Выкл.",
+    "en": "Off"
+  },
+  {
+    "ru": "Резервирование работает",
+    "en": "Backup protection is active"
+  },
+  {
+    "ru": "Создаём копию…",
+    "en": "Creating a backup…"
+  },
+  {
+    "ru": "Пока открыт Premiere Pro",
+    "en": "While Premiere Pro is running"
+  },
+  {
+    "ru": "Пока работает Premiere Versions",
+    "en": "While Premiere Versions is running"
+  },
+  {
+    "ru": "Ручное создание копий доступно",
+    "en": "You can still create backups manually"
+  },
+  {
+    "ru": "Последняя копия проекта — ",
+    "en": "Last project backup — "
+  },
+  {
+    "ru": "Выбери проект, чтобы увидеть его последнюю копию",
+    "en": "Choose a project to see its latest backup"
+  },
+  {
+    "ru": "У этого проекта пока нет резервных копий",
+    "en": "No backups for this project yet"
+  },
+  {
+    "ru": "Создать копию сейчас",
+    "en": "Create backup now"
+  },
+  {
+    "ru": "Показать последнюю копию",
+    "en": "Show latest backup"
+  },
+  {
+    "ru": "Подробнее",
+    "en": "Details"
+  },
+  {
+    "ru": "10 недавних состояний · 12 часовых · 5 дневных",
+    "en": "10 recent states · 12 hourly · 5 daily"
+  },
+  {
+    "ru": "Открыть весь архив",
+    "en": "Open backup archive"
+  },
+  {
+    "ru": "Проверить снова",
+    "en": "Try again"
+  },
+  {
+    "ru": "Ожидание запуска Premiere Pro",
+    "en": "Waiting for Premiere Pro"
+  },
+  {
+    "ru": "Запускать вместе с Premiere Pro",
+    "en": "Launch with Premiere Pro"
+  },
+  {
+    "ru": "Открывать программу в фоне для автоматического резервирования",
+    "en": "Open in the background for automatic backups"
+  },
+  {
+    "ru": "Для автоматического запуска включи Premiere Versions Helper",
+    "en": "Enable Premiere Versions Helper for automatic launch"
+  },
+  {
+    "ru": "Диск отключён или недоступен",
+    "en": "Drive is disconnected or unavailable"
+  },
+  {
+    "ru": "Не удалось создать копию",
+    "en": "Could not create a backup"
+  },
+  {
+    "ru": "Нет доступа к папке копий",
+    "en": "Backup folder access is needed"
+  },
+  {
+    "ru": "Нужен доступ к проектам",
+    "en": "Project access is needed"
+  },
+  {
+    "ru": "Проект ещё сохраняется",
+    "en": "The project is still being saved"
+  },
+  {
+    "ru": "Проект не найден",
+    "en": "Project not found"
+  },
+  {
+    "ru": "Режим резервирования",
+    "en": "Backup mode"
+  },
+  {
+    "ru": "Авто — резервирование работает, пока запущен Premiere Pro, даже если его окно свёрнуто. Всегда — пока работает утилита. Выкл. — только ручное создание копий. Уже начатое копирование завершается перед автоматической паузой. Кнопка создания копии работает с выбранным проектом; одинаковое содержимое не дублируется.",
+    "en": "Auto protects projects while Premiere Pro is running, even when minimized. Always runs while this utility is open. Off allows manual backups only. A copy in progress finishes before an automatic pause. Create backup works on your selected project without duplicating identical content."
+  },
+  {
+    "ru": "Premiere Versions Helper открывает утилиту горячей клавишей из активного Premiere Pro. Настройка «Запускать вместе с Premiere Pro» открывает её в фоне при запуске Premiere. После намеренного полного закрытия утилита не запускается повторно до следующего запуска Premiere. Ручной запуск и сочетание открывают окно. Для фоновой работы может потребоваться разрешение macOS.",
+    "en": "Premiere Versions Helper opens the utility with its shortcut from active Premiere Pro. Launch with Premiere Pro starts it in the background when Premiere launches. If you quit the utility, it stays closed until the next Premiere launch. Opening it manually or using its shortcut shows the window. macOS may require background activity approval."
+  },
+  {
+    "ru": "Без помощника программа не сможет автоматически запускаться вместе с Premiere Pro или открываться горячей клавишей после полного закрытия. Резервирование в работающей программе продолжится.",
+    "en": "Without the helper, the app cannot launch automatically with Premiere Pro or open with its shortcut after quitting completely. Backups in the running app will continue."
+  },
+  {
+    "ru": "Изменений нет — копия актуальна",
+    "en": "No changes — your backup is up to date"
+  },
+  {
+    "ru": "Если проект не менялся, одинаковые копии не создаются",
+    "en": "If the project has not changed, identical backups are not created"
+  },
+  {
+    "ru": "Проверка приостановлена",
+    "en": "Check paused"
   }
 ]

@@ -1,3 +1,13 @@
+# 4.8 Build 1
+
+- New installations start in the menu bar without a Dock icon; existing visibility choices are preserved.
+- A simpler backup panel: clear protection status, the selected project's latest backup and a shortcut to its file. Additional information stays under Details.
+- Off, Auto and Always backup modes. Auto pauses file monitoring when Premiere Pro closes and resumes when it launches, without interrupting a copy already in progress.
+- Optional background launch with Premiere Pro through the existing helper; an intentional quit is respected until the next Premiere launch.
+- Clearer recovery actions for unavailable drives, missing projects and folder permissions.
+- Create a backup of the selected project on demand without a full computer search. Unchanged content is not duplicated.
+- General interface, localization and background activity improvements.
+
 # 4.7 Build 2
 
 - Clarify background helper settings and the confirmation shown when disabling it; simplify repeated status text in both interface languages.

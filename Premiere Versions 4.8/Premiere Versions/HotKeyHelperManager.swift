@@ -33,8 +33,14 @@ import ServiceManagement
         guard installed else { refresh(); return }
         do {
             if value {
+                // Refresh only when the helper implementation changes, not on every app build.
+                if PVHelperPolicy.needsRefresh(enabled: service.status == .enabled,
+                    registeredVersion: UserDefaults.standard.integer(forKey: "hotKeyHelperImplementationVersion")) {
+                    try await service.unregister()
+                }
                 if service.status == .notRegistered || service.status == .notFound { try service.register() }
-                if service.status == .enabled {
+                if service.status == .enabled || service.status == .requiresApproval {
+                    UserDefaults.standard.set(PVHelperPolicy.implementationVersion, forKey: "hotKeyHelperImplementationVersion")
                     UserDefaults.standard.set(currentBuild, forKey: "hotKeyHelperRegisteredBuild")
                     await syncShortcut()
                 }
@@ -46,7 +52,10 @@ import ServiceManagement
         }
     }
     func syncShortcut() async {
-        guard installed, let data = try? JSONEncoder().encode(SavedShortcut.load()) else { return }
+        guard installed, let encoded = try? JSONEncoder().encode(SavedShortcut.load()),
+              var config = try? JSONDecoder().decode(PVHelperShortcut.self, from: encoded) else { return }
+        config.launchWithPremiere = UserDefaults.standard.object(forKey: "launchWithPremiere") as? Bool ?? true
+        guard let data = try? JSONEncoder().encode(config) else { return }
         let success = await PVHelperPreferencesWriter.configure(data)
         if !success { message = PVL("Не удалось сохранить сочетание для помощника") }
     }
@@ -85,5 +94,35 @@ import ServiceManagement
         self.continuation = nil;timeout?.cancel();timeout = nil
         connection?.invalidationHandler = nil;connection?.interruptionHandler = nil;connection?.invalidate();connection = nil
         continuation.resume(returning: success)
+    }
+}
+
+@MainActor enum PVHelperLaunchIntent {
+    static func consume() async -> Bool {
+        await withCheckedContinuation { continuation in
+            let request = PVLaunchIntentRequest(continuation); request.start()
+        }
+    }
+}
+@MainActor private final class PVLaunchIntentRequest {
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var connection: NSXPCConnection?
+    private var timeout: Task<Void, Never>?
+    init(_ continuation: CheckedContinuation<Bool, Never>) { self.continuation = continuation }
+    func start() {
+        let connection = NSXPCConnection(serviceName: (Bundle.main.bundleIdentifier ?? "") + ".IconService")
+        self.connection = connection; connection.remoteObjectInterface = NSXPCInterface(with: PVIconServiceProtocol.self)
+        connection.invalidationHandler = { Task { @MainActor in self.finish(false) } }
+        connection.interruptionHandler = { Task { @MainActor in self.finish(false) } }
+        connection.resume()
+        timeout = Task { @MainActor in try? await Task.sleep(nanoseconds: 2_000_000_000); self.finish(false) }
+        guard let proxy = connection.remoteObjectProxyWithErrorHandler({ _ in Task { @MainActor in self.finish(false) } }) as? PVIconServiceProtocol else { finish(false); return }
+        proxy.consumeBackgroundLaunch { result in Task { @MainActor in self.finish(result) } }
+    }
+    private func finish(_ value: Bool) {
+        guard let continuation else { return }; self.continuation = nil
+        timeout?.cancel(); timeout = nil
+        connection?.invalidationHandler = nil; connection?.interruptionHandler = nil; connection?.invalidate(); connection = nil
+        continuation.resume(returning: value)
     }
 }

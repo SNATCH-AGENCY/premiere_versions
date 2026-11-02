@@ -9,14 +9,14 @@ Its purpose is simple: **help protect important edits with deliberate version sa
 ## A safety net for your projects
 
 - **Save important milestones.** Keep a numbered copy before a major change, a client revision or a new direction. Add a short comment so you remember what changed.
-- **Keep backups in the background.** While the app is running and backup monitoring is enabled, it discovers projects created within the last 48 hours and keeps recent, hourly and daily checkpoints. Enrolled projects remain protected after that window.
+- **Keep backups in the background.** In Auto mode, it watches projects while Premiere Pro is running and keeps recent, hourly and daily checkpoints. New automatic discovery starts with projects created within the last 48 hours. Enrolled projects remain protected after that window.
 - **Find your way back.** Manual versions have readable names and comments; backup names include the project, checkpoint type and time.
 - **Keep your archive manageable.** Older automatic backups rotate. Your manual versions stay until you decide to remove them. Original project files and Premiere’s own Auto-Saves are left untouched.
 
 ## Get started
 
 1. Download the **DMG installer** from [Releases](https://github.com/pewakkk/premiere_versions/releases/latest), open it and **drag Premiere Versions.app onto Applications**. Open the app from Applications, then eject the installer.
-2. Choose your Premiere project and allow access to the folders you want to use. Enable backup monitoring in Settings.
+2. Choose your Premiere project and allow access to the folders you want to use. Choose Auto backup mode in Settings.
 3. Save your latest changes in Premiere Pro with **Command+S**.
 4. With Premiere Pro active, press **Option+S**, choose a version number, then press Return. Add an optional comment and press Return again to keep the copy.
 
@@ -48,17 +48,28 @@ Completed copies are checked before old managed copies are removed. Original fil
 
 The optional **latest Premiere autosave** switch keeps one matching file from the project's neighboring `Adobe Premiere Pro Auto-Save` folder. This copy has its own subfolder, separate from the utility's history. Premiere's original autosaves remain untouched.
 
-## Keep the shortcut available
+## Choose how protection runs
 
-**Premiere Versions Helper**, the optional background shortcut helper, can open the installed utility after you quit it, while Premiere Pro is active. macOS may ask you to allow its background item. The helper only listens for the configured shortcut; **backup monitoring still requires the main utility to be running**. Your existing shortcut and preferences are preserved.
+**Auto** runs backups while Premiere Pro is open, including when it is minimized. Closing Premiere pauses the backup timer and file monitoring; a copy already in progress is completed safely. **Always** keeps monitoring while the utility is running. **Off** leaves manual backup creation available.
+
+The backup panel shows your selected project's latest copy and a button to reveal it in Finder. **Create backup now** checks only that project and can save a changed state before the automatic five-minute interval; identical content is not duplicated. Open **Details** for retention information and the optional Premiere autosave mirror.
+
+## Ready when Premiere opens
+
+New installations use the **menu bar without a Dock icon**. Click the menu bar icon to open the window, or use its right-click menu to quit. You can restore the Dock icon in Settings. Existing visibility choices are preserved when updating.
+
+**Premiere Versions Helper** keeps your shortcut available from active Premiere Pro after quitting the utility completely. Enable **Launch with Premiere Pro** to open the utility quietly in the background when Premiere starts. If you quit the utility intentionally, it stays closed until the next Premiere launch. Opening it manually or using its shortcut still shows its window.
+
+The helper must be enabled and allowed by macOS. It does not copy projects itself; the main utility performs backups. An existing disabled backup preference stays Off when updating; existing enabled monitoring becomes Auto. Your folder locations and other choices stay saved.
 
 ## Latest improvements
 
-- **Smarter backup history.** Ten recent changed states at five-minute intervals, twelve hourly checkpoints and five daily checkpoints share copies without filling the archive with identical files.
-- **Premiere Auto-Save protection.** Optionally keep the latest matching Premiere autosave in a separate folder alongside your backups.
-- **Reliable project organization.** Selected projects stay protected at any age; projects with the same name from different locations receive separate, remembered folders.
-- **A shortcut that stays available.** An optional background helper opens the utility from active Premiere Pro even after the utility has quit.
-- Safer copy verification and cleanup, plus reduced repeated disk reads.
+- **A simpler backup panel.** See protection status and your selected project's latest backup, create a copy or reveal its file. Additional information stays under Details.
+- **Off, Auto or Always.** Auto backs up while Premiere Pro is running and pauses file monitoring when it closes. A copy already in progress finishes safely.
+- **Ready when you edit.** Optionally launch the utility quietly with Premiere Pro. If you quit it intentionally, it stays closed until the next Premiere launch.
+- **Clearer recovery.** Understand when a drive is unavailable, folder access is needed or a project cannot be found, with a relevant next action.
+- **A backup on demand.** Create a copy of the selected project without searching the computer. Identical content is not duplicated.
+- General interface, localization and background activity improvements.
 
 ## Your work stays yours
 

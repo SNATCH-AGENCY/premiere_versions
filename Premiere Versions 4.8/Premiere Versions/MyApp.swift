@@ -26,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let autosaveMonitor = AutosaveMonitor()
     private let hotKey = GlobalSaveHotKey()
     private var saveWindow: NSWindow?
+    private var explicitlyReopened = false
     private let menuBar = PVMenuBarController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -37,8 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuBar.start()
         PVBrand.applySelectedIcon()
         // An explicit launch must always reveal the utility, including its unfinished welcome.
-        NSApp.setActivationPolicy(UserDefaults.standard.object(forKey: "showInDock") as? Bool == false ? .accessory : .regular)
-        DispatchQueue.main.async { self.showSaveWindow() }
+        NSApp.setActivationPolicy((UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? false) ? .regular : .accessory)
+        Task { @MainActor in
+            let backgroundLaunch = await PVHelperLaunchIntent.consume()
+            if !backgroundLaunch || explicitlyReopened { self.showSaveWindow() }
+        }
     }
 
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { false }
@@ -89,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        explicitlyReopened = true
         showSaveWindow()
         return false
     }
@@ -275,11 +280,55 @@ final class GlobalSaveHotKey: ObservableObject {
 @MainActor
 final class AutosaveMonitor: ObservableObject {
     @Published private(set) var monitoringSince: Date?
+    @Published private(set) var isMonitoring = false
+    @Published private(set) var premiereRunning = false
+    @Published private(set) var issue: PVBackupIssue?
+    @Published private(set) var latestBackup: PVLatestBackup?
+    @Published private(set) var manualCopyUnchanged = false
+    private var selectedProject: URL?
+    private var selectionGeneration = 0
+    private let premiereLifecycle = PVPremiereLifecycle()
+    var mode: PVBackupMode { PVBackupMode(rawValue: UserDefaults.standard.string(forKey: "backupMode") ?? "automatic") ?? .automatic }
+    func selectProject(_ url: URL?) {
+        selectedProject = url; selectionGeneration += 1; latestBackup = nil; issue = nil; manualCopyUnchanged = false
+        refreshLatest()
+    }
+    func refreshLatest() {
+        let token = selectionGeneration
+        guard let project = selectedProject else { latestBackup = nil; return }
+        queue.async { [weak self, worker] in
+            let latest = try? worker.latestBackup(for: project)
+            DispatchQueue.main.async {
+                guard let self, self.selectionGeneration == token else { return }
+                self.latestBackup = latest
+            }
+        }
+    }
+    func revealLatest() {
+        guard let latest = latestBackup else { return }
+        do {
+            let root = try worker.resolveBookmark(forKey: "autosaveArchiveBookmark")
+            let access = root.startAccessingSecurityScopedResource(); defer { if access { root.stopAccessingSecurityScopedResource() } }
+            guard FileManager.default.fileExists(atPath: latest.file.path) else { latestBackup = nil; issue = PVBackupIssue.disconnected(root) ? .diskUnavailable : .copyFailed; return }
+            NSWorkspace.shared.activateFileViewerSelecting([latest.file])
+        } catch { issue = .archiveAccess }
+    }
+    func reconcile() {
+        premiereRunning = !premiereLifecycle.processes.isEmpty
+        UserDefaults.standard.set(mode != .off, forKey: "autosaveMonitoringEnabled")
+        if mode.runs(premiereRunning: premiereRunning) { if timer == nil { start() } }
+        else {
+            if !activeScanIsManual { activeScan?.cancel() }
+            timer?.invalidate(); timer = nil; monitoringSince = nil; isMonitoring = false; stopWatching()
+            status = PVL(mode == .off ? "Мониторинг выключен" : "Ожидание запуска Premiere Pro")
+        }
+    }
     @Published var status = PVL("Мониторинг не настроен")
     private var timer: Timer?
     @Published private(set) var isScanning = false
     private var generation = 0
     private var activeScan: ScanCancellation?
+    private var activeScanIsManual = false
     private let queue = DispatchQueue(label: "PremiereVersions.autosaves", qos: .utility)
     private let worker = AutosaveWorker()
     private var eventStream: FSEventStreamRef?
@@ -287,6 +336,7 @@ final class AutosaveMonitor: ObservableObject {
     private var volumeObservers: [NSObjectProtocol] = []
 
     init() {
+        PVBackupMode.migrate()
         DefaultLocations.refreshMovedFolders()
         DefaultLocations.install()
         let center = NSWorkspace.shared.notificationCenter
@@ -303,19 +353,21 @@ final class AutosaveMonitor: ObservableObject {
                 }
             })
         }
-        if UserDefaults.standard.bool(forKey: "autosaveMonitoringEnabled") {
-            start()
-        }
+        premiereLifecycle.onChange = { [weak self] _ in self?.reconcile() }
+        reconcile()
+        refreshLatest()
     }
 
     func start() {
         stop()
-        guard UserDefaults.standard.bool(forKey: "autosaveMonitoringEnabled"),
-              UserDefaults.standard.data(forKey: searchBookmarkKey) != nil,
+        guard mode.runs(premiereRunning: premiereRunning) else { return }
+        guard UserDefaults.standard.data(forKey: searchBookmarkKey) != nil,
               UserDefaults.standard.data(forKey: "autosaveArchiveBookmark") != nil else {
             status = PVL("Разреши доступ для поиска и сохранения копий")
             return
         }
+        isMonitoring = true
+        issue = nil
         monitoringSince = Date()
         status = PVL("Мониторинг включён · проверка каждые \(Int(BackupPolicy.checkInterval)) секунд")
         let timer = Timer(timeInterval: BackupPolicy.checkInterval, repeats: true) { [weak self] _ in
@@ -333,18 +385,15 @@ final class AutosaveMonitor: ObservableObject {
         timer?.invalidate()
         timer = nil
         monitoringSince = nil
+        isMonitoring = false
         stopWatching()
         status = PVL("Мониторинг выключен")
     }
 
     func checkNow() {
-        guard UserDefaults.standard.data(forKey: searchBookmarkKey) != nil,
-              UserDefaults.standard.data(forKey: "autosaveArchiveBookmark") != nil else {
-            status = PVL("Сначала разреши доступ для поиска и сохранения копий")
-            return
-        }
+        guard UserDefaults.standard.data(forKey: "savedProjectBookmark") != nil else { issue = .sourceMissing; return }
+        guard UserDefaults.standard.data(forKey: "autosaveArchiveBookmark") != nil else { issue = .archiveAccess; return }
         guard !isScanning else { return }
-        queue.async { [worker] in worker.index.reset() }
         scan(manual: true)
     }
 
@@ -354,8 +403,9 @@ final class AutosaveMonitor: ObservableObject {
 
     func configurationChanged() {
         queue.async { [worker] in worker.index.reset() }
-        if UserDefaults.standard.bool(forKey: "autosaveMonitoringEnabled") { start() }
-        else { status = PVL("Настройки поиска изменены") }
+        stop()
+        reconcile()
+        refreshLatest()
     }
 
     func authorizeComputer() {
@@ -482,25 +532,44 @@ final class AutosaveMonitor: ObservableObject {
     private func scan(manual: Bool = false) {
         guard (manual || timer != nil), !isScanning else { return }
         isScanning = true
+        issue = nil
+        manualCopyUnchanged = false
         status = PVL("Проверяю проекты и автосейвы…")
         let currentGeneration = generation
         let cancellation = ScanCancellation()
         activeScan = cancellation
+        activeScanIsManual = manual
         let worker = self.worker
+        let project = selectedProject
+        let selectionToken = selectionGeneration
         queue.async { [weak self] in
             let message: String
+            var problem: PVBackupIssue?
+            var unchangedManual = false
             do {
-                let result = try worker.scanAutosaves(cancellation: cancellation)
+                let result = try worker.scanAutosaves(forceSelected: manual, cancellation: cancellation)
+                unchangedManual = manual && result.copied == 0 && result.unchanged > 0
+                problem = result.selectedIssue
+                if let project, !FileManager.default.fileExists(atPath: project.path) { problem = PVBackupIssue.disconnected(project) ? .diskUnavailable : .sourceMissing }
                 message = PVL("Найдено: \(result.found) · скопировано: \(result.copied) · уже в архиве: \(result.unchanged) · ожидают стабильности: \(result.waiting)") + (result.outsideCreationWindow == 0 ? "" : PVL(" · вне окна 48 ч: \(result.outsideCreationWindow)")) + (result.nativeCopied == 0 ? "" : PVL(" · копий Premiere: \(result.nativeCopied)")) + (result.failed == 0 ? "" : PVL(" · ошибок копирования: \(result.failed)")) + (result.inaccessible == 0 ? "" : PVL(" · нет доступа к папкам: \(result.inaccessible)"))
+            } catch is CancellationError {
+                message = PVL("Проверка приостановлена")
             } catch {
+                let defaults = UserDefaults.standard
+                let archive = (try? worker.resolveBookmark(forKey: "autosaveArchiveBookmark")) ?? URL(fileURLWithPath: defaults.string(forKey: "autosaveArchivePath") ?? DefaultLocations.autosaves)
+                problem = PVBackupIssue.classify(error, project: project, archive: archive)
                 message = PVL("Ошибка мониторинга: \(error.localizedDescription)")
             }
+            let latest = project.flatMap { try? worker.latestBackup(for: $0) }
+            let selectedProblem = problem
+            let noManualChanges = unchangedManual
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 self.isScanning = false
                 self.activeScan = nil
                 guard self.generation == currentGeneration else { return }
                 self.status = message
+                if self.selectionGeneration == selectionToken { self.latestBackup = latest; self.issue = selectedProblem; self.manualCopyUnchanged = noManualChanges }
                 if self.timer != nil && self.eventStream == nil {
                     self.status += PVL("\nОтслеживание новых файлов недоступно. Используй «Проверить сейчас» или выдай доступ заново.")
                 }
@@ -546,6 +615,9 @@ nonisolated enum DefaultLocations {
         if (defaults.string(forKey: "archivePath") ?? "").isEmpty { defaults.set(versions, forKey: "archivePath") }
         if (defaults.string(forKey: "autosaveArchivePath") ?? "").isEmpty { defaults.set(autosaves, forKey: "autosaveArchivePath") }
         if defaults.string(forKey: "searchMode") == nil { defaults.set("all", forKey: "searchMode") }
+        if defaults.object(forKey: "showInDock") == nil { defaults.set(false, forKey: "showInDock") }
+        if defaults.object(forKey: "menuBarIconEnabled") == nil { defaults.set(true, forKey: "menuBarIconEnabled") }
+        if !defaults.bool(forKey: "showInDock") && !defaults.bool(forKey: "menuBarIconEnabled") { defaults.set(true, forKey: "menuBarIconEnabled") }
         if defaults.object(forKey: "copyPremiereAutosave") == nil { defaults.set(true, forKey: "copyPremiereAutosave") }
         if defaults.object(forKey: "autosaveMonitoringEnabled") == nil { defaults.set(true, forKey: "autosaveMonitoringEnabled") }
     }
@@ -701,6 +773,7 @@ nonisolated struct AutosaveScanResult: Sendable {
     var nativeCopied = 0
     var nativeWaiting = 0
     var failed = 0
+    var selectedIssue: PVBackupIssue?
 }
 
 /// All filesystem work runs on a serial utility queue, never on the UI thread.
@@ -709,11 +782,34 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
     let index = ProjectFileIndex()
     private let archiveEngine = PVBackupArchive()
     private let nativeEngine = PVLatestNativeAutosave()
-    @discardableResult
-    func scanAutosaves(cancellation: ScanCancellation? = nil) throws -> AutosaveScanResult {
-        let key = UserDefaults.standard.string(forKey: "searchMode") == "folder" ? "autosaveWatchBookmark" : "computerSearchBookmark"
-        let root = try resolveBookmark(forKey: key)
+    func latestBackup(for project: URL) throws -> PVLatestBackup? {
         let archive = try resolveBookmark(forKey: "autosaveArchiveBookmark")
+        return try withScopedAccess(to: archive) {
+            try withScopedAccess(to: project) {
+                guard let folder = PVProjectFolders.shared.existing(for: project, archive: archive) else { return nil }
+                return try archiveEngine.latest(source: project, folder: folder)
+            }
+        }
+    }
+    func scanSelected(project: URL, archive: URL, cancellation: ScanCancellation? = nil) throws -> AutosaveScanResult {
+        try withScopedAccess(to: project) {
+            try withScopedAccess(to: archive) {
+                try scanAutosaves(watchURL: project.deletingLastPathComponent(), archiveURL: archive, indexedFiles: [project], selectedProject: project, copyNative: UserDefaults.standard.object(forKey: "copyPremiereAutosave") as? Bool ?? true, forceSelected: true, cancellation: cancellation)
+            }
+        }
+    }
+    @discardableResult
+    func scanAutosaves(forceSelected: Bool = false, cancellation: ScanCancellation? = nil) throws -> AutosaveScanResult {
+        let archive: URL
+        do { archive = try resolveBookmark(forKey: "autosaveArchiveBookmark") } catch { throw PVBackupIssue.archiveAccess }
+        if forceSelected {
+            let project: URL
+            do { project = try resolveBookmark(forKey: "savedProjectBookmark") } catch { throw PVBackupIssue.sourceMissing }
+            return try scanSelected(project: project, archive: archive, cancellation: cancellation)
+        }
+        let key = UserDefaults.standard.string(forKey: "searchMode") == "folder" ? "autosaveWatchBookmark" : "computerSearchBookmark"
+        let root: URL
+        do { root = try resolveBookmark(forKey: key) } catch { throw PVBackupIssue.searchAccess }
         do {
         return try withScopedAccess(to: root) {
             try withScopedAccess(to: archive) {
@@ -723,8 +819,12 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
                 let selectedAccess = selected?.startAccessingSecurityScopedResource() ?? false
                 defer { if selectedAccess { selected?.stopAccessingSecurityScopedResource() } }
                 if let selected, FileManager.default.fileExists(atPath: selected.path), !files.contains(selected), !ProjectSourceFilter.isExcluded(selected) { files.append(selected) }
+                if forceSelected {
+                    guard let selected else { throw PVBackupFailure.invalidSource }
+                    files = [selected]
+                }
                 var result = try scanAutosaves(watchURL: root, archiveURL: archive, indexedFiles: files,
-                    selectedProject: selected, copyNative: UserDefaults.standard.object(forKey: "copyPremiereAutosave") as? Bool ?? true, cancellation: cancellation)
+                    selectedProject: selected, copyNative: UserDefaults.standard.object(forKey: "copyPremiereAutosave") as? Bool ?? true, forceSelected: forceSelected, cancellation: cancellation)
                 result.inaccessible = index.inaccessible.count
                 return result
             }
@@ -737,7 +837,7 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
 
     @discardableResult
     func scanAutosaves(watchURL: URL, archiveURL: URL, indexedFiles: [URL]? = nil,
-                      selectedProject: URL? = nil, copyNative: Bool = true, now: Date = Date(),
+                      selectedProject: URL? = nil, copyNative: Bool = true, forceSelected: Bool = false, now: Date = Date(),
                       cancellation: ScanCancellation? = nil) throws -> AutosaveScanResult {
         var result = AutosaveScanResult()
         return try withScopedAccess(to: watchURL) {
@@ -749,23 +849,24 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
                 let candidates = try (indexedFiles ?? ProjectFileIndex().projects(in: watchURL, excluding: [archiveURL], cancellation: cancellation)).filter { !ProjectSourceFilter.isExcluded($0) }
                 result.found = candidates.count
                 for source in candidates {
+                    let selected = selectedProject.map { PVProjectFolders.canonical($0) == PVProjectFolders.canonical(source) } ?? false
                     try cancellation?.check()
                     do {
                         let values = try source.resourceValues(forKeys: [.isRegularFileKey, .creationDateKey, .contentModificationDateKey, .fileSizeKey])
                         guard values.isRegularFile == true, let modified = values.contentModificationDate,
-                              (values.fileSize ?? 0) > 0, now.timeIntervalSince(modified) >= BackupPolicy.stableDelay else { result.waiting += 1; continue }
-                        let selected = selectedProject.map { PVProjectFolders.canonical($0) == PVProjectFolders.canonical(source) } ?? false
+                              (values.fileSize ?? 0) > 0, now.timeIntervalSince(modified) >= BackupPolicy.stableDelay else { result.waiting += 1; if selected { result.selectedIssue = .writing }; continue }
                         let known = PVProjectFolders.shared.existing(for: source, archive: archiveURL) != nil
                         let legacy = archiveURL.appendingPathComponent(source.deletingPathExtension().lastPathComponent)
                         let unclaimed = !fileManager.fileExists(atPath: legacy.appendingPathComponent(".pv-source.json").path)
                         let hasLegacy = unclaimed && ((try? fileManager.contentsOfDirectory(at: legacy, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []).contains { BackupNaming.isManaged($0.lastPathComponent, project: source.deletingPathExtension().lastPathComponent) }
                         guard selected || known || hasLegacy || BackupPolicy.acceptsCreation(values.creationDate, now: now) else { result.outsideCreationWindow += 1; continue }
                         let folder = try PVProjectFolders.shared.folder(for: source, archive: archiveURL, allowLegacyClaim: hasLegacy)
-                        switch try archiveEngine.process(source: source, folder: folder, now: now) {
+                        switch try archiveEngine.process(source: source, folder: folder, now: now, forceSnapshot: forceSelected && selected) {
                         case .copied: result.copied += 1
                         case .unchanged: result.unchanged += 1
                         case .waiting: result.waiting += 1
                         }
+                        try cancellation?.check()
                         if copyNative {
                             do {
                                 switch try nativeEngine.process(project: source, archiveFolder: folder, now: now) {
@@ -776,8 +877,9 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
                             } catch PVBackupFailure.changingSource { result.nativeWaiting += 1 }
                             catch { result.failed += 1 }
                         }
-                    } catch PVBackupFailure.changingSource { result.waiting += 1 }
-                    catch { result.failed += 1 }
+                    } catch is CancellationError { throw CancellationError() }
+                    catch PVBackupFailure.changingSource { result.waiting += 1; if selected { result.selectedIssue = .writing } }
+                    catch { result.failed += 1; if selected { result.selectedIssue = PVBackupIssue.classify(error, project: source, archive: archiveURL) } }
                 }
                 return result
             }

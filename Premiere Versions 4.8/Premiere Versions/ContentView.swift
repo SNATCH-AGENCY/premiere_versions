@@ -7,8 +7,8 @@ struct ContentView: View {
     @AppStorage("windowBackgroundOpacity") private var windowBackgroundOpacity = 1.0
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     private var backdropOpacity: Double { PVWindowAppearance.opacity(windowBackgroundOpacity, reduceTransparency: reduceTransparency) }
-    @AppStorage("showInDock") private var showInDock = true
-    @AppStorage("menuBarIconEnabled") private var menuBarIconEnabled = false
+    @AppStorage("showInDock") private var showInDock = false
+    @AppStorage("menuBarIconEnabled") private var menuBarIconEnabled = true
     @AppStorage("archivePath")
     private var archivePath = DefaultLocations.versions
 
@@ -94,6 +94,9 @@ struct ContentView: View {
     @AppStorage("autosaveMonitoringEnabled")
     private var autosaveMonitoringEnabled = false
 
+    @State private var backupDetailsExpanded = false
+    @AppStorage("backupMode") private var backupMode = "automatic"
+    @AppStorage("launchWithPremiere") private var launchWithPremiere = true
     @AppStorage("copyPremiereAutosave") private var copyPremiereAutosave = true
     @AppStorage("searchMode") private var searchMode = "all"
 
@@ -159,6 +162,7 @@ struct ContentView: View {
                                 if !inside && !panelPinned && !panelClosing { schedulePanelClose(activePanel) }
                             }
                             .position(panelPosition(for: activePanel, in: geometry.size))
+                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: backupDetailsExpanded)
                             .compositingGroup()
                             .blur(radius: reduceMotion ? 0 : (1 - panelProgress) * 12)
                             .opacity(panelProgress)
@@ -178,6 +182,9 @@ struct ContentView: View {
         .background { PVEscapeCapture(action: handleEscape) }
         .background { PVWindowVisibility(visible: $visibleWindow) }
         .environment(\.locale, Locale(identifier: interfaceLanguage == "ru" ? "ru" : "en"))
+        .onChange(of: sourceProjectURL) { _, url in autosaveMonitor.selectProject(url) }
+        .onChange(of: backupMode) { _, _ in autosaveMonitor.reconcile() }
+        .onChange(of: launchWithPremiere) { _, _ in Task { await hotKeyHelper.syncShortcut() } }
         .onChange(of: hotKey.shortcut) { _, _ in Task { await hotKeyHelper.syncShortcut() } }
         .onChange(of: logoVariant) { _, _ in PVBrand.applySelectedIcon(allowIconAccessPrompt: true) }
         .onChange(of: userLogos.revision) { _, _ in PVBrand.applySelectedIcon(allowIconAccessPrompt: true) }
@@ -292,7 +299,7 @@ struct ContentView: View {
                         Text(PVL("Резервное копирование")).font(.system(size: 20, weight: .medium))
                         backupCard
                     }.padding(24)
-                }.frame(width: 510, height: min(310, maxHeight)).background(theme.panel)
+                }.frame(width: 510, height: min(backupDetailsExpanded ? 420 : 340, maxHeight)).background(theme.panel)
             case .help:
                 PVPersistentScrollView {
                     PVHelpView(replayWelcome: replayWelcome, checkUpdates: checkUpdatesFromHelp)
@@ -419,7 +426,7 @@ struct ContentView: View {
         let available = size.height - 32
         switch panel {
         case .settings: dimensions = CGSize(width: 510, height: min(420, available))
-        case .backups: dimensions = CGSize(width: 510, height: min(310, available))
+        case .backups: dimensions = CGSize(width: 510, height: min(backupDetailsExpanded ? 420 : 340, available))
         case .help: dimensions = CGSize(width: 440, height: min(360, available))
         case .shortcut: dimensions = CGSize(width: 340, height: min(310, available))
         case .logoEditor: dimensions = CGSize(width: 470, height: min(420, available))
@@ -778,68 +785,89 @@ struct ContentView: View {
         UserDefaults.standard.data(forKey: "autosaveArchiveBookmark") == nil || UserDefaults.standard.data(forKey: "archiveBookmark") == nil
     }
 
-    private var compactBackupStatus: String {
-        if autosaveMonitor.isScanning { return PVL("Проверка…") }
-        if !autosaveMonitoringEnabled { return PVL("Выключен") }
-        if needsSearchAccess || needsArchiveAccess { return PVL("Нужен доступ") }
-        if PVL(autosaveMonitor.status).localizedCaseInsensitiveContains(PVL("ошибка")) { return PVL("Ошибка проверки") }
-        return PVL("Мониторинг включён")
+    private var backupProblem: PVBackupIssue? {
+        if needsArchiveAccess { return .archiveAccess }
+        if needsSearchAccess { return .searchAccess }
+        return autosaveMonitor.issue
     }
-
+    private var compactBackupStatus: String {
+        if let problem = backupProblem { return PVL(problem.title) }
+        if autosaveMonitor.isScanning { return PVL("Создаём копию…") }
+        if autosaveMonitor.manualCopyUnchanged { return PVL("Изменений нет — копия актуальна") }
+        if backupMode == "off" { return PVL("Резервирование выключено") }
+        if backupMode == "automatic", !autosaveMonitor.premiereRunning { return PVL("Ожидание запуска Premiere Pro") }
+        return PVL("Резервирование работает")
+    }
     private var backupCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Button {} label: {
-                    HStack(spacing: 8) {
-                        Circle().fill(autosaveMonitoringEnabled ? theme.mint : theme.muted.opacity(0.5)).frame(width: 6, height: 6)
-                        Text(PVL("Резервные копии")).font(.system(size: 13, weight: .medium))
-                        Text(PVL(compactBackupStatus)).font(.system(size: 10)).foregroundStyle(theme.muted)
+        VStack(alignment: .leading, spacing: 22) {
+            HStack {
+                Text(PVL("Режим")).font(.system(size: 12)).foregroundStyle(theme.muted)
+                Spacer()
+                HStack(spacing: 2) {
+                    ForEach(PVBackupMode.allCases, id: \.rawValue) { mode in
+                        Button { backupMode = mode.rawValue } label: {
+                            Text(PVL(mode.title)).font(.system(size: 12, weight: backupMode == mode.rawValue ? .medium : .regular))
+                                .padding(.horizontal, 16).padding(.vertical, 8)
+                                .background { if backupMode == mode.rawValue { RoundedRectangle(cornerRadius: 9).fill(theme.accent.opacity(0.40)) } }
+                        }.buttonStyle(.plain)
+                            .accessibilityAddTraits(backupMode == mode.rawValue ? .isSelected : [])
                     }
-                }.buttonStyle(.plain).accessibilityLabel(PVL("Показать подробности резервного копирования"))
-                Spacer(minLength: 4)
-                Toggle(PVL("Резервное копирование"), isOn: $autosaveMonitoringEnabled)
-                    .labelsHidden().toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
-                    .onChange(of: autosaveMonitoringEnabled) { _, enabled in
-                        if enabled { autosaveMonitor.start() } else { autosaveMonitor.stop() }
-                    }
+                }.padding(3).background(RoundedRectangle(cornerRadius: 12).fill(theme.ink.opacity(0.045)))
             }
-
-            VStack(alignment: .leading, spacing: 10) {
-                if let since = autosaveMonitor.monitoringSince {
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        Text(PVL("Мониторинг включён") + " · " + PVUptime.label(since: since, now: context.date))
-                            .font(.system(size: 11)).foregroundStyle(theme.muted)
+            HStack(alignment: .top, spacing: 10) {
+                Circle().fill(backupProblem != nil ? Color(red: 0.86, green: 0.68, blue: 0.73) : autosaveMonitor.isMonitoring ? theme.mint : theme.muted.opacity(0.5))
+                    .frame(width: 7, height: 7).padding(.top, 5)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(compactBackupStatus).font(.system(size: 14, weight: .medium))
+                    Text(PVL(backupMode == "automatic" ? "Пока открыт Premiere Pro" : backupMode == "always" ? "Пока работает Premiere Versions" : "Ручное создание копий доступно"))
+                        .font(.system(size: 11)).foregroundStyle(theme.muted)
+                    if let problem = backupProblem {
+                        Button(PVL(problem == .searchAccess || problem == .archiveAccess ? "Разрешить доступ" : problem == .sourceMissing ? "Выбрать проект" : "Проверить снова")) {
+                            panelPinned = true
+                            switch problem {
+                            case .searchAccess: if searchMode == "folder" { chooseAutosaveWatchFolder() } else { autosaveMonitor.authorizeComputer() }
+                            case .archiveAccess: autosaveMonitor.authorizeArchives()
+                            case .sourceMissing: dismissPanel(); chooseProject()
+                            default: autosaveMonitor.checkNow()
+                            }
+                        }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(theme.accent)
                     }
                 }
-                Toggle(PVL("Копировать последний автосейв Premiere"), isOn: $copyPremiereAutosave)
-                    .toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
-                Text(PVL("10 снимков с шагом 5 минут · 12 часовых · 5 дневных"))
-                    .font(.system(size: 10)).foregroundStyle(theme.muted)
-                Text(PVL("Новые проекты: последние 48 ч · работает без интернета"))
-                    .font(.system(size: 10)).foregroundStyle(theme.muted)
-                Text(PVL(autosaveMonitor.status))
-                    .font(.system(size: 11)).foregroundStyle(theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .help(PVL(autosaveMonitor.status)).textSelection(.enabled)
-                HStack(spacing: 8) {
-                    if searchMode == "all" ? needsSearchAccess : UserDefaults.standard.data(forKey: "autosaveWatchBookmark") == nil {
-                        Button(searchMode == "folder" ? PVL("Выбрать папку…") : PVL("Разрешить поиск…")) {
-                            if searchMode == "folder" { chooseAutosaveWatchFolder() }
-                            else { panelPinned = true; autosaveMonitor.authorizeComputer() }
-                        }.buttonStyle(PVQuietButtonStyle())
-                    }
-                    if needsArchiveAccess {
-                        Button(PVL("Разрешить сохранение…")) { panelPinned = true; autosaveMonitor.authorizeArchives() }
-                            .buttonStyle(PVQuietButtonStyle())
-                    }
-                    Button(autosaveMonitor.isScanning ? PVL("Проверка…") : PVL("Проверить сейчас")) { autosaveMonitor.checkNow() }
-                        .buttonStyle(PVQuietButtonStyle())
-                        .disabled(autosaveMonitor.isScanning || needsSearchAccess)
-                    Spacer(minLength: 0)
-                    Button(action: openAutosaveArchive) { Image(systemName: "folder") }
-                        .buttonStyle(PVQuietButtonStyle()).help(PVL("Открыть архив автосейвов"))
-                }
             }
+            HStack(spacing: 9) {
+                Image(systemName: "clock").font(.system(size: 13))
+                if sourceProjectURL == nil {
+                    Text(PVL("Выбери проект, чтобы увидеть его последнюю копию"))
+                } else if let latest = autosaveMonitor.latestBackup {
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        Text(PVL("Последняя копия проекта — ") + PVBackupRelativeTime.label(latest.captured, now: context.date))
+                    }
+                } else { Text(PVL("У этого проекта пока нет резервных копий")) }
+            }.font(.system(size: 11)).foregroundStyle(theme.muted)
+                .help(PVL("Если проект не менялся, одинаковые копии не создаются"))
+            HStack(spacing: 12) {
+                Button { autosaveMonitor.checkNow() } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "square.and.arrow.down")
+                        Text(PVL(autosaveMonitor.isScanning ? "Создаём копию…" : "Создать копию сейчас"))
+                        Spacer(minLength: 0)
+                    }.frame(maxWidth: .infinity)
+                }.buttonStyle(PVQuietButtonStyle()).disabled(autosaveMonitor.isScanning || sourceProjectURL == nil || needsArchiveAccess)
+                Button { autosaveMonitor.revealLatest() } label: { Image(systemName: "folder") }
+                    .buttonStyle(PVQuietButtonStyle()).disabled(autosaveMonitor.latestBackup == nil)
+                    .help(PVL("Показать последнюю копию")).accessibilityLabel(PVL("Показать последнюю копию"))
+            }
+            DisclosureGroup(isExpanded: $backupDetailsExpanded) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Toggle(PVL("Копировать последний автосейв Premiere"), isOn: $copyPremiereAutosave)
+                        .toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
+                    Text(PVL("10 недавних состояний · 12 часовых · 5 дневных"))
+                        .font(.system(size: 10)).foregroundStyle(theme.muted)
+                    Text(PVL(autosaveMonitor.status)).font(.system(size: 10)).foregroundStyle(theme.muted)
+                        .fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
+                    Button(PVL("Открыть весь архив"), action: openAutosaveArchive).buttonStyle(.plain).font(.system(size: 11))
+                }.padding(.top, 12)
+            } label: { Text(PVL("Подробнее")).font(.system(size: 11)).foregroundStyle(theme.muted) }
         }
     }
 
@@ -905,11 +933,16 @@ struct ContentView: View {
                     Button(PVL("Отмена"), role: .cancel) { }
                     Button(PVL("Подтвердить"), role: .destructive) { Task { await hotKeyHelper.enable(false) } }
                 } message: {
-                    Text(PVL("После полного закрытия программы горячая клавиша перестанет открывать Premiere Versions. Резервные копии создаются, пока сама программа работает."))
+                    Text(PVL("Без помощника программа не сможет автоматически запускаться вместе с Premiere Pro или открываться горячей клавишей после полного закрытия. Резервирование в работающей программе продолжится."))
                 }
                 Text(PVL("Позволяет открыть Premiere Versions горячей клавишей из активного Premiere Pro даже после полного закрытия программы."))
                     .font(.system(size: 10)).foregroundStyle(theme.muted)
                 Text(PVL(hotKeyHelper.message)).font(.system(size: 10)).foregroundStyle(theme.muted)
+                Toggle(PVL("Запускать вместе с Premiere Pro"), isOn: $launchWithPremiere)
+                    .toggleStyle(.switch).controlSize(.mini).tint(theme.mint).disabled(!hotKeyHelperEnabled)
+                Text(PVL(hotKeyHelperEnabled ? "Открывать программу в фоне для автоматического резервирования" : "Для автоматического запуска включи Premiere Versions Helper"))
+                    .font(.system(size: 10)).foregroundStyle(theme.muted)
+
                 if hotKeyHelper.needsApproval {
                     Button(PVL("Разрешить в macOS")) { hotKeyHelper.openApproval() }.buttonStyle(PVQuietButtonStyle())
                 }
@@ -1035,9 +1068,7 @@ struct ContentView: View {
                 Text(PVL(hotKey.status)).font(.system(size: 11)).foregroundStyle(theme.muted)
             }
             HStack {
-                Label(autosaveMonitor.isScanning ? PVL("Проверка…") :
-                        !autosaveMonitoringEnabled ? PVL("Резервирование выключено") :
-                        needsSearchAccess || needsArchiveAccess ? PVL("Разрешить резервирование") : PVL("Резервирование включено"),
+                Label(compactBackupStatus,
                       systemImage: needsSearchAccess || needsArchiveAccess ? "exclamationmark.circle" : "checkmark.circle")
                     .font(.system(size: 11, weight: .regular))
                     .contentShape(Rectangle())
@@ -1609,7 +1640,7 @@ private final class ShortcutCaptureNSView: NSView {
 }
 
 nonisolated enum AppRelease {
-    static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "4.7" }
+    static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "4.8" }
     static var build: String { Bundle.main.infoDictionary?["PVBuildNumber"] as? String ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1" }
     static var label: String { version + " · Build " + build }
     static let author = "pewakkk"
@@ -1718,7 +1749,8 @@ private struct PVHelpView: View {
             section(PVL("Выбор проекта"), PVL("Если проект не выбран или недоступен, выбери файл на отдельном экране. После выбора Enter или прокрутка вниз открывают версию. Название проекта со стрелкой вверх возвращает к выбору; прокрутка вверх с версии туда не ведёт. Удалённый проект больше не считается активным."))
             section(PVL("Настройки и обновления"), PVL("Прокрутка настроек сохраняется на 10 секунд после закрытия. Значок Dock можно скрыть, сохранив доступ через строку меню. Проверки обновлений идут в фоне при запуске и раз в 6 часов; коралловая точка сообщает о новой версии. Установка остаётся ручной."))
             section(PVL("Автосейв Premiere"), PVL("По желанию программа читает соседнюю папку Adobe Premiere Pro Auto-Save и сохраняет одну последнюю копию именно этого проекта в одноимённой подпапке своего архива. Оригиналы Premiere не меняются. Предыдущая зеркальная копия удаляется только после успешного создания новой. Если папки нет или доступ не разрешён, свои снимки продолжают работать."))
-            section(PVL("Фоновый вызов"), PVL("Отдельный помощник может запускать программу сочетанием после полного закрытия программы. Он работает только при активном Premiere Pro и использует выбранное сочетание. macOS может потребовать разрешить фоновую работу. Помощник не выполняет резервное копирование: для него основная программа должна быть запущена."))
+            section(PVL("Режим резервирования"), PVL("Авто — резервирование работает, пока запущен Premiere Pro, даже если его окно свёрнуто. Всегда — пока работает утилита. Выкл. — только ручное создание копий. Уже начатое копирование завершается перед автоматической паузой. Кнопка создания копии работает с выбранным проектом; одинаковое содержимое не дублируется."))
+            section(PVL("Фоновый вызов"), PVL("Premiere Versions Helper открывает утилиту горячей клавишей из активного Premiere Pro. Настройка «Запускать вместе с Premiere Pro» открывает её в фоне при запуске Premiere. После намеренного полного закрытия утилита не запускается повторно до следующего запуска Premiere. Ручной запуск и сочетание открывают окно. Для фоновой работы может потребоваться разрешение macOS."))
             section(PVL("Прозрачность"), PVL("В настройках можно менять плотность фона от 15% до 100%. При уменьшении за окном остаётся матовое размытие, текст и кнопки сохраняют читаемость. Выбор запоминается. При включённом уменьшении прозрачности в macOS используется непрозрачный фон."))
             section(PVL("Клавиши и логотип"), PVL("Сейчас: \(hotKey.shortcut.display). Сочетание работает в активном Premiere Pro. При записи используется английская раскладка, прежняя возвращается после завершения. Наведение открывает настройки; запись начинается отдельным нажатием. Встроенные логотипы находятся в приложении. Выбор Dock и два пользовательских варианта сохраняются между версиями. Выбранный значок сохраняется и для закрытого приложения после разрешения доступа к папке программы. При обновлении он применяется к запущенной новой версии, старые архивные приложения не меняются."))
             Divider().overlay(theme.border)
@@ -1751,4 +1783,13 @@ private struct PVFloatingSurface: ViewModifier {
 private struct PVFooterHeight: PreferenceKey {
     static let defaultValue: CGFloat = 50
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
+private enum PVBackupRelativeTime {
+    static func label(_ date: Date, now: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = Locale(identifier: UserDefaults.standard.string(forKey: "interfaceLanguage") == "ru" ? "ru" : "en")
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: now)
+    }
 }

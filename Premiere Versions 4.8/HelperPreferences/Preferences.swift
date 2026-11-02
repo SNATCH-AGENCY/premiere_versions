@@ -15,6 +15,12 @@ final class Preferences: NSObject, PVHelperPreferencesProtocol {
               let expected=Bundle(url:owner)?.executableURL else{return false}
         return executable.resolvingSymlinksInPath()==expected.resolvingSymlinksInPath()
     }
+    func setBackgroundLaunch(_ enabled: Bool, reply: @escaping (Bool) -> Void) {
+        guard let domain = Bundle(url: Self.owner)?.bundleIdentifier else { reply(false); return }
+        CFPreferencesSetValue("backgroundLaunchUntil" as CFString, enabled ? NSNumber(value: Date().timeIntervalSince1970 + 20) : nil,
+                              domain as CFString, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        reply(CFPreferencesSynchronize(domain as CFString, kCFPreferencesCurrentUser, kCFPreferencesAnyHost))
+    }
     func readShortcut(reply: @escaping (Data?) -> Void) {
         guard let domain=Bundle(url:Self.owner)?.bundleIdentifier else{reply(nil);return}
         CFPreferencesSynchronize(domain as CFString,kCFPreferencesCurrentUser,kCFPreferencesAnyHost)

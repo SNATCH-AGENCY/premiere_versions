@@ -6,13 +6,13 @@ def build(root,app,owner_id,*,testing=False):
  root,app=Path(root),Path(app)
  helper=app/'Contents/Library/LoginItems/Premiere Versions Helper.app';binary=helper/'Contents/MacOS/Premiere Versions Helper';binary.parent.mkdir(parents=True,exist_ok=True)
  metadata=plistlib.loads((root/'AppMetadata.plist').read_bytes())
- info={'CFBundleIdentifier':owner_id+'.HotKeyHelper','CFBundleExecutable':'Premiere Versions Helper','CFBundleName':'Premiere Versions Helper','CFBundleDisplayName':'Premiere Versions Helper','CFBundlePackageType':'APPL','CFBundleVersion':os.environ.get('CURRENT_PROJECT_VERSION','4.7.1'),'CFBundleShortVersionString':os.environ.get('MARKETING_VERSION','4.7'),'LSUIElement':True,'LSMinimumSystemVersion':os.environ.get('MACOSX_DEPLOYMENT_TARGET','26.6.2'),'NSPrincipalClass':'NSApplication','PVOwnerBundleIdentifier':owner_id}
+ info={'CFBundleIdentifier':owner_id+'.HotKeyHelper','CFBundleExecutable':'Premiere Versions Helper','CFBundleName':'Premiere Versions Helper','CFBundleDisplayName':'Premiere Versions Helper','CFBundlePackageType':'APPL','CFBundleVersion':os.environ.get('CURRENT_PROJECT_VERSION','4.8.1'),'CFBundleShortVersionString':os.environ.get('MARKETING_VERSION','4.8'),'LSUIElement':True,'LSMinimumSystemVersion':os.environ.get('MACOSX_DEPLOYMENT_TARGET','26.6.2'),'NSPrincipalClass':'NSApplication','PVOwnerBundleIdentifier':owner_id}
  (helper/'Contents/Info.plist').write_bytes(plistlib.dumps(info))
  modules=Path(os.environ.get('DERIVED_FILE_DIR',str(app.parent)))/'PVHotKeyHelperModules'
  arch=os.environ.get('CURRENT_ARCH','arm64')
  if arch not in ['arm64','x86_64']:arch='arm64'
  sdk=subprocess.check_output(['xcrun','--sdk','macosx','--show-sdk-path'],text=True).strip()
- args=['xcrun','swiftc','-parse-as-library','-O','-swift-version','5','-module-cache-path',str(modules),'-sdk',sdk,'-target',arch+'-apple-macos'+os.environ.get('MACOSX_DEPLOYMENT_TARGET','26.6.2'),str(root/'Premiere Versions/HelperShortcut.swift'),str(root/'Premiere Versions/HelperPreferencesProtocol.swift'),str(root/'HotKeyHelper/PreferenceReader.swift'),str(root/'HotKeyHelper/Helper.swift'),'-o',str(binary)]
+ args=['xcrun','swiftc','-parse-as-library','-O','-swift-version','5','-module-cache-path',str(modules),'-sdk',sdk,'-target',arch+'-apple-macos'+os.environ.get('MACOSX_DEPLOYMENT_TARGET','26.6.2'),str(root/'Premiere Versions/HelperShortcut.swift'),str(root/'Premiere Versions/PremiereLifecycle.swift'),str(root/'Premiere Versions/HelperPreferencesProtocol.swift'),str(root/'HotKeyHelper/PreferenceReader.swift'),str(root/'HotKeyHelper/Helper.swift'),'-o',str(binary)]
  if testing:args.insert(2,'-D');args.insert(3,'PV_HELPER_TESTING')
  subprocess.run(args,check=True)
  # Sandboxed login items are required when the owning app is sandboxed.

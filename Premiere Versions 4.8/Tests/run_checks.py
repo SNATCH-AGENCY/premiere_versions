@@ -149,6 +149,7 @@ let suite = "pv-default-checks-" + UUID().uuidString
 let preferences = UserDefaults(suiteName: suite)!
 defer { preferences.removePersistentDomain(forName: suite) }
 DefaultLocations.install(in: preferences)
+assert(!preferences.bool(forKey:"showInDock") && preferences.bool(forKey:"menuBarIconEnabled"))
 assert(preferences.string(forKey: "archivePath") == DefaultLocations.versions)
 assert(preferences.string(forKey: "autosaveArchivePath") == DefaultLocations.autosaves)
 preferences.set("/external/My Versions", forKey: "archivePath")
@@ -158,6 +159,7 @@ preferences.set(false, forKey: "autosaveMonitoringEnabled")
 let bookmark = Data([1, 2, 3, 4])
 preferences.set(bookmark, forKey: "archiveBookmark")
 preferences.set("custom", forKey: "logoVariant")
+preferences.set(true,forKey:"showInDock"); preferences.set(false,forKey:"menuBarIconEnabled")
 preferences.set(0.37, forKey: "windowBackgroundOpacity")
 DefaultLocations.install(in: preferences)
 assert(preferences.string(forKey: "archivePath") == "/external/My Versions")
@@ -166,6 +168,7 @@ assert(preferences.string(forKey: "searchMode") == "folder")
 assert(!preferences.bool(forKey: "autosaveMonitoringEnabled"))
 assert(preferences.data(forKey: "archiveBookmark") == bookmark)
 assert(preferences.string(forKey: "logoVariant") == "custom")
+assert(preferences.bool(forKey:"showInDock") && !preferences.bool(forKey:"menuBarIconEnabled"))
 assert(preferences.double(forKey: "windowBackgroundOpacity") == 0.37)
 // A new process catches up with fresh local projects; no network is used.
 let freshWatch = root.appendingPathComponent("fresh-watch")

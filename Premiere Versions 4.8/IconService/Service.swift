@@ -36,6 +36,16 @@ final class IconService: NSObject, PVIconServiceProtocol {
               let expected = Bundle(url: owner)?.executableURL else { return false }
         return executable.resolvingSymlinksInPath() == expected.resolvingSymlinksInPath()
     }
+    func consumeBackgroundLaunch(reply: @escaping (Bool) -> Void) {
+        guard Self.trustedOwner(Self.owner), let ownerID = Bundle(url: Self.owner)?.bundleIdentifier else { reply(false); return }
+        let domain = (ownerID + ".HotKeyHelper") as CFString
+        CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        let until = CFPreferencesCopyValue("backgroundLaunchUntil" as CFString, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? NSNumber
+        CFPreferencesSetValue("backgroundLaunchUntil" as CFString, nil, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        let saved = CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        let remaining = (until?.doubleValue ?? 0) - Date().timeIntervalSince1970
+        reply(saved && remaining > 0 && remaining <= 20)
+    }
     func configureHotKeyHelper(_ data: Data, reply: @escaping (Bool, String) -> Void) {
         guard Self.trustedOwner(Self.owner), data.count <= 512,
               let shortcut = try? JSONDecoder().decode(PVHelperShortcut.self, from: data), shortcut.isValid,

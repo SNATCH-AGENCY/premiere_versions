@@ -51,3 +51,9 @@ The current app is ad-hoc signed. Its designated requirement changes with code; 
 Before each release, scan the outgoing source and application resources for credentials, private data, personal paths and image metadata. Review the complete published Git history with the local secret scanner. The private release pipeline also applies the publication identity/editorial policy and stops on findings or missing checks. Never publish private scan reports or policies. Published archives are immutable; changes to resources require a new build.
 
 Manual archive enumeration is triggered by project/save/reactivation events rather than view evaluation. New backup enrollment uses the 48-hour creation window; per-project enrollment is stored locally in the archive and survives restarts.
+
+## Background launch and backup modes
+
+The existing sandboxed login item observes workspace application-list changes and process-exit events. Auto mode removes its timer and FSEvents stream when Premiere is absent; cancellation is observed between completed safe copies. Manual backup targets the selected source and preserves content deduplication. Helper launch settings use the fixed validated XPC preference channel; a short-lived one-use intent distinguishes quiet background launches from explicit opens. Refresh helper registration only when its implementation version changes, not for each app build.
+
+Before publication, run backup engine/mode checks, native interface checks and the isolated real workspace automatic-launch fixture in addition to the release privacy, signed update and icon service gates. Apple service lifecycle reference: https://developer.apple.com/documentation/servicemanagement/smappservice

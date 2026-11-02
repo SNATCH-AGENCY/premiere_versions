@@ -2,10 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>LSUIElement</key>
+	<true/>
 	<key>PVBuildDate</key>
-	<string>2026-11-02T15:39:59+00:00</string>
+	<string>2026-11-02T19:55:03+00:00</string>
 	<key>PVBuildNumber</key>
-	<string>2</string>
+	<string>1</string>
 	<key>SUAutomaticallyUpdate</key>
 	<false/>
 	<key>SUEnableAutomaticChecks</key>

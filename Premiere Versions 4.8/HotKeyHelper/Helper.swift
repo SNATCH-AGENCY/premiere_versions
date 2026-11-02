@@ -15,7 +15,41 @@ import Darwin
     private var ownerExit: DispatchSourceProcess?
     private var ownerPID: pid_t?
     private var exitedPID: pid_t?
+    private var knownOwner: NSRunningApplication?
     private var launching = false
+    private var autoLaunch = false
+    private var preferencesLoaded = false
+    private var autoPolicy = PVAutoLaunchPolicy()
+    private var autoTask: Task<Void, Never>?
+    private let premiereLifecycle = PVPremiereLifecycle()
+    private var premiereProcesses: Set<Int32> { premiereLifecycle.processes }
+    private func considerAutomaticLaunch(justEnabled: Bool = false) {
+        guard preferencesLoaded else { return }
+        let shouldLaunch = autoPolicy.shouldLaunch(processes: premiereProcesses, enabled: autoLaunch, ownerRunning: mainRunning, justEnabled: justEnabled)
+        guard shouldLaunch, !launching else { return }
+        launching = true; unregister()
+        autoTask = Task { @MainActor in
+            guard await HelperLaunchTicket.set(true) else { launching = false; refresh(); return }
+            // Recheck after the asynchronous ticket write: never open a second instance or an orphaned session.
+            guard !mainRunning, !premiereProcesses.isEmpty, autoLaunch else {
+                _ = await HelperLaunchTicket.set(false); launching = false; refresh(); return
+            }
+            launchOwner(background: true)
+        }
+    }
+    private func launchOwner(background: Bool) {
+        let config = NSWorkspace.OpenConfiguration(); config.activates = !background; config.hides = background
+        config.addsToRecentItems = false; config.allowsRunningApplicationSubstitution = false
+        NSWorkspace.shared.openApplication(at: owner, configuration: config) { [weak self] application, error in
+            Task { @MainActor in
+                if let self, let application, application.bundleURL?.resolvingSymlinksInPath() == self.owner {
+                    self.knownOwner = application; self.exitedPID = nil
+                }
+                if background, error != nil { _ = await HelperLaunchTicket.set(false) }
+                self?.launching = false; self?.refresh()
+            }
+        }
+    }
     #if PV_HELPER_TESTING
     private var testEvents: DispatchSourceFileSystemObject?
     private var testRoot: URL? {
@@ -27,7 +61,7 @@ import Darwin
     }
     private func reportTestState() {
         guard let root = testRoot else { return }
-        let value: [String: Any] = ["running": true, "mainRunning": mainRunning, "registered": hotKey != nil, "key": Int(shortcut.keyCode), "pid": Int(ProcessInfo.processInfo.processIdentifier)]
+        let value: [String: Any] = ["running": true, "mainRunning": mainRunning, "registered": hotKey != nil, "key": Int(shortcut.keyCode), "pid": Int(ProcessInfo.processInfo.processIdentifier), "auto": autoLaunch, "premiereCount": premiereProcesses.count, "launching": launching]
         if let data = try? JSONSerialization.data(withJSONObject: value) { try? data.write(to: root.appendingPathComponent("helper-state.json"), options: .atomic) }
     }
     #endif
@@ -36,12 +70,15 @@ import Darwin
     }
     private var ownerID: String { Bundle.main.object(forInfoDictionaryKey: "PVOwnerBundleIdentifier") as? String ?? "" }
     private var helperID: String { Bundle.main.bundleIdentifier ?? "" }
-    private var mainRunning: Bool {
-        NSRunningApplication.runningApplications(withBundleIdentifier: ownerID).contains {
-            !$0.isTerminated && $0.processIdentifier != exitedPID && $0.bundleURL?.resolvingSymlinksInPath() == owner &&
-            (Darwin.kill($0.processIdentifier, 0) == 0 || errno != ESRCH)
+    private var runningOwner: NSRunningApplication? {
+        func valid(_ app: NSRunningApplication) -> Bool {
+            !app.isTerminated && app.processIdentifier != exitedPID && app.bundleURL?.resolvingSymlinksInPath() == owner &&
+            (Darwin.kill(app.processIdentifier, 0) == 0 || errno != ESRCH)
         }
+        if let knownOwner, valid(knownOwner) { return knownOwner }
+        return NSRunningApplication.runningApplications(withBundleIdentifier: ownerID).first(where: valid)
     }
+    private var mainRunning: Bool { runningOwner != nil }
     private var premiereActive: Bool {
         #if PV_HELPER_TESTING
         if testRoot != nil { return true }
@@ -53,6 +90,7 @@ import Darwin
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.prohibited)
         guard !ownerID.isEmpty, Bundle(url: owner)?.bundleIdentifier == ownerID else { NSApp.terminate(nil); return }
+        premiereLifecycle.onChange = { [weak self] _ in self?.refresh() }
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didActivateApplicationNotification, NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
             workspaceObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.refresh() } })
@@ -104,7 +142,10 @@ import Darwin
             if testRoot != nil {fallback=PVHelperShortcut(keyCode:UInt32(kVK_F20),modifiers:UInt32(cmdKey|optionKey|controlKey|shiftKey),keyLabel:"F20")}
             #endif
             let updated=stored?.isValid==true ? stored! : fallback
+            let justEnabled = !autoLaunch && updated.launchWithPremiere == true
+            autoLaunch = updated.launchWithPremiere == true; preferencesLoaded = true
             if updated != shortcut {unregister();shortcut=updated}
+            considerAutomaticLaunch(justEnabled: justEnabled)
             refresh()
         }
     }
@@ -113,6 +154,7 @@ import Darwin
         defer { reportTestState() }
         #endif
         watchOwnerExit()
+        considerAutomaticLaunch()
         guard !launching, PVHelperPolicy.shouldListen(mainRunning: mainRunning, premiereActive: premiereActive) else { unregister(); return }
         guard hotKey == nil else { return }
         let id = EventHotKeyID(signature: 0x5056484B, id: 1)
@@ -120,9 +162,7 @@ import Darwin
         if status != noErr { hotKey = nil }
     }
     private func watchOwnerExit() {
-        let app=NSRunningApplication.runningApplications(withBundleIdentifier:ownerID).first {
-            !$0.isTerminated && $0.processIdentifier != exitedPID && $0.bundleURL?.resolvingSymlinksInPath()==owner
-        }
+        let app = runningOwner
         guard let app else {ownerExit?.cancel();ownerExit=nil;ownerPID=nil;return}
         let pid=app.processIdentifier
         guard ownerPID != pid else{return}
@@ -130,7 +170,7 @@ import Darwin
         let stream=DispatchSource.makeProcessSource(identifier:pid,eventMask:.exit,queue:.main)
         stream.setEventHandler{[weak self] in
             guard let self, self.ownerPID == pid else{return}
-            self.exitedPID=pid;self.ownerExit?.cancel();self.ownerExit=nil;self.ownerPID=nil;self.refresh()
+            self.exitedPID=pid;self.knownOwner=nil;self.ownerExit?.cancel();self.ownerExit=nil;self.ownerPID=nil;self.refresh()
         }
         ownerExit=stream;stream.resume()
     }
@@ -138,16 +178,14 @@ import Darwin
     private func pressed() {
         guard !launching, PVHelperPolicy.shouldListen(mainRunning: mainRunning, premiereActive: premiereActive) else { refresh(); return }
         launching = true; unregister()
-        let config = NSWorkspace.OpenConfiguration(); config.activates = true; config.addsToRecentItems = false; config.allowsRunningApplicationSubstitution = false
-        NSWorkspace.shared.openApplication(at: owner, configuration: config) { [weak self] _, _ in
-            Task { @MainActor in self?.launching = false; self?.refresh() }
-        }
+        launchOwner(background: false)
     }
     func applicationWillTerminate(_ notification: Notification) {
         #if PV_HELPER_TESTING
         testEvents?.cancel()
         #endif
-        ownerExit?.cancel(); preferencesTask?.cancel(); refreshTask?.cancel(); unregister()
+        premiereLifecycle.stop()
+        ownerExit?.cancel(); autoTask?.cancel(); preferencesTask?.cancel(); refreshTask?.cancel(); unregister()
         if let handler { RemoveEventHandler(handler) }
         for observer in workspaceObservers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         if let preferencesObserver { DistributedNotificationCenter.default().removeObserver(preferencesObserver) }

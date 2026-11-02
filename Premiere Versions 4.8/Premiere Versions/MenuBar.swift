@@ -20,7 +20,7 @@ final class PVMenuBarController: NSObject {
     }
 
     private func refresh() {
-        let showDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? true
+        let showDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? false
         if !showDock && !UserDefaults.standard.bool(forKey: Self.preferenceKey) { UserDefaults.standard.set(true, forKey: Self.preferenceKey) }
         let policy: NSApplication.ActivationPolicy = showDock ? .regular : .accessory
         if NSApp.activationPolicy() != policy { NSApp.setActivationPolicy(policy) }
