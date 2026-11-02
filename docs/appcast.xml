@@ -3,14 +3,14 @@
     <channel>
         <title>Premiere Versions</title>
         <item>
-            <title>4.6</title>
-            <pubDate>Mon, 02 Nov 2026 18:08:18 +0300</pubDate>
+            <title>4.7</title>
+            <pubDate>Mon, 02 Nov 2026 21:35:39 +0300</pubDate>
             <link>https://github.com/pewakkk/premiere_versions</link>
-            <sparkle:version>4.6.2</sparkle:version>
-            <sparkle:shortVersionString>4.6</sparkle:shortVersionString>
+            <sparkle:version>4.7.1</sparkle:version>
+            <sparkle:shortVersionString>4.7</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.6.2</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/pewakkk/premiere_versions/releases/download/v4.6-build2/Premiere-Versions-4.6-Build-2.zip" length="6617360" type="application/octet-stream" sparkle:edSignature="sL6H8XWtV6vkpVP3QyJqKg+GZA+AI4UhSxxM+FvwnOHndLXVlf4Lz4InwiPGLsZXbg7BLn5TlYp0iTY9IA8/DQ=="/>
+            <enclosure url="https://github.com/pewakkk/premiere_versions/releases/download/v4.7-build1/Premiere-Versions-4.7-Build-1.zip" length="6784317" type="application/octet-stream" sparkle:edSignature="Dgf9PKdiTiaTZeZgqKEP7nsUrn7ev17eJl6dob04vLCPuNUIH7hpT+I451hnKODl/5bt0RnC3YLWilMSHOELCA=="/>
         </item>
     </channel>
 </rss>
