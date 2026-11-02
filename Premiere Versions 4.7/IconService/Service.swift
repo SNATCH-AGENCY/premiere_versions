@@ -3,7 +3,7 @@ import Foundation
 import Security
 import Darwin
 
-/// Narrow service: no commands, arbitrary file writes or project access are exposed.
+/// Owning-app service: Finder metadata and one validated helper preference; no arbitrary commands, paths or project access.
 final class IconService: NSObject, PVIconServiceProtocol {
     static var owner: URL {
         Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -35,6 +35,21 @@ final class IconService: NSObject, PVIconServiceProtocol {
               let values = info as? [String: Any], let executable = values[kSecCodeInfoMainExecutable as String] as? URL,
               let expected = Bundle(url: owner)?.executableURL else { return false }
         return executable.resolvingSymlinksInPath() == expected.resolvingSymlinksInPath()
+    }
+    func configureHotKeyHelper(_ data: Data, reply: @escaping (Bool, String) -> Void) {
+        guard Self.trustedOwner(Self.owner), data.count <= 512,
+              let shortcut = try? JSONDecoder().decode(PVHelperShortcut.self, from: data), shortcut.isValid,
+              let ownerID = Bundle(url: Self.owner)?.bundleIdentifier else { reply(false, "Invalid helper configuration."); return }
+        let identifier = ownerID + ".HotKeyHelper"
+        let helper = Self.owner.appendingPathComponent("Contents/Library/LoginItems/Premiere Versions Helper.app")
+        guard Bundle(url: helper)?.bundleIdentifier == identifier else { reply(false, "Owning helper is missing."); return }
+        // Exactly one fixed preference key in the owning helper's domain; no path or command is accepted.
+        let key = "globalSaveShortcut" as CFString
+        let domain = identifier as CFString
+        CFPreferencesSetValue(key, data as CFData, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        guard CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) else { reply(false, "Could not save helper preferences."); return }
+        DistributedNotificationCenter.default().postNotificationName(Notification.Name(identifier + ".configurationChanged"), object: nil, userInfo: nil, deliverImmediately: true)
+        reply(true, "")
     }
     func applyIcon(_ png: Data, targetPath: String, reply: @escaping (Bool, String) -> Void) {
         let target = URL(fileURLWithPath: targetPath).resolvingSymlinksInPath().standardizedFileURL

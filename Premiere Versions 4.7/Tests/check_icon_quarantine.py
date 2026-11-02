@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib, importlib.util, plistlib, shutil, subprocess, sys, tempfile, uuid, time
 root=Path(__file__).resolve().parents[1]
 pristine=Path(sys.argv[1]).resolve()
+sys.path.insert(0,str(root/'tools'))
 spec=importlib.util.spec_from_file_location('icon_builder',root/'tools/build_icon_service.py')
 builder=importlib.util.module_from_spec(spec);spec.loader.exec_module(builder)
 def run(args):subprocess.run(list(map(str,args)),check=True)

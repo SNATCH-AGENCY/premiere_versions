@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         hotKey.onPress = { [weak self] in self?.showSaveWindow() }
         hotKey.start()
+        PVHotKeyHelperManager.shared.start()
         PVUpdateService.shared.startAutomaticChecks()
         menuBar.onOpen = { [weak self] in self?.showSaveWindow() }
         menuBar.start()
@@ -490,7 +491,7 @@ final class AutosaveMonitor: ObservableObject {
             let message: String
             do {
                 let result = try worker.scanAutosaves(cancellation: cancellation)
-                message = PVL("Найдено: \(result.found) · скопировано: \(result.copied) · уже в архиве: \(result.unchanged) · ожидают стабильности: \(result.waiting)") + (result.outsideCreationWindow == 0 ? "" : PVL(" · вне окна 48 ч: \(result.outsideCreationWindow)")) + (result.inaccessible == 0 ? "" : PVL(" · нет доступа к папкам: \(result.inaccessible)"))
+                message = PVL("Найдено: \(result.found) · скопировано: \(result.copied) · уже в архиве: \(result.unchanged) · ожидают стабильности: \(result.waiting)") + (result.outsideCreationWindow == 0 ? "" : PVL(" · вне окна 48 ч: \(result.outsideCreationWindow)")) + (result.nativeCopied == 0 ? "" : PVL(" · копий Premiere: \(result.nativeCopied)")) + (result.failed == 0 ? "" : PVL(" · ошибок копирования: \(result.failed)")) + (result.inaccessible == 0 ? "" : PVL(" · нет доступа к папкам: \(result.inaccessible)"))
             } catch {
                 message = PVL("Ошибка мониторинга: \(error.localizedDescription)")
             }
@@ -545,12 +546,14 @@ nonisolated enum DefaultLocations {
         if (defaults.string(forKey: "archivePath") ?? "").isEmpty { defaults.set(versions, forKey: "archivePath") }
         if (defaults.string(forKey: "autosaveArchivePath") ?? "").isEmpty { defaults.set(autosaves, forKey: "autosaveArchivePath") }
         if defaults.string(forKey: "searchMode") == nil { defaults.set("all", forKey: "searchMode") }
+        if defaults.object(forKey: "copyPremiereAutosave") == nil { defaults.set(true, forKey: "copyPremiereAutosave") }
         if defaults.object(forKey: "autosaveMonitoringEnabled") == nil { defaults.set(true, forKey: "autosaveMonitoringEnabled") }
     }
 }
 
 nonisolated enum BackupPolicy {
     static let checkInterval: TimeInterval = 30
+    static let snapshotInterval: TimeInterval = 5 * 60
     static let stableDelay: TimeInterval = 12
     static let newProjectHours = 48
     static func acceptsCreation(_ date: Date?, now: Date) -> Bool {
@@ -695,14 +698,17 @@ nonisolated struct AutosaveScanResult: Sendable {
     var waiting = 0
     var inaccessible = 0
     var outsideCreationWindow = 0
+    var nativeCopied = 0
+    var nativeWaiting = 0
+    var failed = 0
 }
 
 /// All filesystem work runs on a serial utility queue, never on the UI thread.
 nonisolated final class AutosaveWorker: @unchecked Sendable {
     private let fileManager = FileManager.default
     let index = ProjectFileIndex()
-    private(set) var archiveDirectoryReads = 0
-    private var archivedSnapshots: [String: (date: Date, size: Int, archive: URL)] = [:]
+    private let archiveEngine = PVBackupArchive()
+    private let nativeEngine = PVLatestNativeAutosave()
     @discardableResult
     func scanAutosaves(cancellation: ScanCancellation? = nil) throws -> AutosaveScanResult {
         let key = UserDefaults.standard.string(forKey: "searchMode") == "folder" ? "autosaveWatchBookmark" : "computerSearchBookmark"
@@ -712,8 +718,13 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
         return try withScopedAccess(to: root) {
             try withScopedAccess(to: archive) {
                 let versions = URL(fileURLWithPath: UserDefaults.standard.string(forKey: "archivePath") ?? DefaultLocations.versions)
-                let files = try index.projects(in: root, excluding: [archive, versions], cancellation: cancellation)
-                var result = try scanAutosaves(watchURL: root, archiveURL: archive, indexedFiles: files, cancellation: cancellation)
+                var files = try index.projects(in: root, excluding: [archive, versions], cancellation: cancellation)
+                let selected = try? resolveBookmark(forKey: "savedProjectBookmark")
+                let selectedAccess = selected?.startAccessingSecurityScopedResource() ?? false
+                defer { if selectedAccess { selected?.stopAccessingSecurityScopedResource() } }
+                if let selected, FileManager.default.fileExists(atPath: selected.path), !files.contains(selected), !ProjectSourceFilter.isExcluded(selected) { files.append(selected) }
+                var result = try scanAutosaves(watchURL: root, archiveURL: archive, indexedFiles: files,
+                    selectedProject: selected, copyNative: UserDefaults.standard.object(forKey: "copyPremiereAutosave") as? Bool ?? true, cancellation: cancellation)
                 result.inaccessible = index.inaccessible.count
                 return result
             }
@@ -725,160 +736,51 @@ nonisolated final class AutosaveWorker: @unchecked Sendable {
     }
 
     @discardableResult
-    func scanAutosaves(watchURL: URL, archiveURL: URL, indexedFiles: [URL]? = nil, cancellation: ScanCancellation? = nil) throws -> AutosaveScanResult {
+    func scanAutosaves(watchURL: URL, archiveURL: URL, indexedFiles: [URL]? = nil,
+                      selectedProject: URL? = nil, copyNative: Bool = true, now: Date = Date(),
+                      cancellation: ScanCancellation? = nil) throws -> AutosaveScanResult {
         var result = AutosaveScanResult()
-        do {
-            try withScopedAccess(to: watchURL) {
-                try withScopedAccess(to: archiveURL) {
-                    let keys: Set<URLResourceKey> = [.isRegularFileKey, .creationDateKey, .contentModificationDateKey, .fileSizeKey]
-                    let watchPath = watchURL.resolvingSymlinksInPath().standardizedFileURL.path
-                    let archivePath = archiveURL.resolvingSymlinksInPath().standardizedFileURL.path
-                    guard watchPath != archivePath, !watchPath.hasPrefix(archivePath + "/") else {
-                        throw NSError(domain: "PremiereVersions", code: 20, userInfo: [NSLocalizedDescriptionKey: PVL("Папка наблюдения не должна совпадать с архивом или находиться внутри него.")])
-                    }
-                    let discovered = try indexedFiles ?? ProjectFileIndex().projects(in: watchURL, excluding: [archiveURL], cancellation: cancellation)
-                    let candidates = discovered.filter { !ProjectSourceFilter.isExcluded($0) }
-
-                    result.found = candidates.count
-                    let now = Date()
-                    for source in candidates {
-                        try cancellation?.check()
-                        guard let values = try? source.resourceValues(forKeys: keys),
-                              values.isRegularFile == true,
-                              let modified = values.contentModificationDate,
-                              let size = values.fileSize,
-                              size > 0,
-                              now.timeIntervalSince(modified) >= BackupPolicy.stableDelay else {
-                            result.waiting += 1
-                            continue
-                        }
-
-                        let projectName = source.deletingPathExtension().lastPathComponent
-                        let projectFolder = archiveURL.appendingPathComponent(projectName, isDirectory: true)
-                        let enrollment = projectFolder.appendingPathComponent(".pv-source.json")
-                        let canonicalSource = source.resolvingSymlinksInPath().standardizedFileURL.path
-                        let enrolledPath = (try? Data(contentsOf: enrollment)).flatMap { try? JSONDecoder().decode(String.self, from: $0) }
-                        var enrolled = enrolledPath == canonicalSource
-                        let fresh = BackupPolicy.acceptsCreation(values.creationDate, now: now)
-                        // Adopt an existing managed archive once; an explicit different source is never adopted.
-                        if !enrolled && !fresh && !fileManager.fileExists(atPath: enrollment.path),
-                           fileManager.fileExists(atPath: projectFolder.path) {
-                            archiveDirectoryReads += 1
-                            let existing = try fileManager.contentsOfDirectory(at: projectFolder, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles])
-                            enrolled = existing.contains { file in
-                                BackupNaming.isManaged(file.lastPathComponent, project: projectName) &&
-                                (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-                            }
-                        }
-                        guard fresh || enrolled else {
-                            result.outsideCreationWindow += 1
-                            continue
-                        }
-
-                        let cacheKey = archiveURL.path + "#" + source.path
-                        if let cached = archivedSnapshots[cacheKey], cached.date == modified, cached.size == size,
-                           fileManager.fileExists(atPath: cached.archive.path) {
-                            result.unchanged += 1
-                            continue
-                        }
-                        try fileManager.createDirectory(
-                            at: projectFolder,
-                            withIntermediateDirectories: true
-                        )
-
-                        let stamp = Int(modified.timeIntervalSince1970)
-                        let legacy = projectFolder.appendingPathComponent("\(projectName)_autosave_\(stamp).prproj")
-                        let destination = projectFolder.appendingPathComponent(BackupNaming.filename(project: projectName, modified: modified, status: .recent))
-                        // The same source snapshot must not duplicate an old-format copy or
-                        // a copy made in another local time zone.
-                        archiveDirectoryReads += 1
-                        let matchingSnapshot = (try? fileManager.contentsOfDirectory(at: projectFolder, includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey]))?.first { file in
-                            guard file.pathExtension.lowercased() == "prproj",
-                                  let metadata = try? file.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]),
-                                  let date = metadata.contentModificationDate else { return false }
-                            return metadata.fileSize == size && abs(date.timeIntervalSince(modified)) < 0.001
-                        }
-                        let sameSnapshot = matchingSnapshot != nil
-                        if !fileManager.fileExists(atPath: destination.path) && !fileManager.fileExists(atPath: legacy.path) && !sameSnapshot {
-                            try fileManager.copyItem(at: source, to: destination)
-                            result.copied += 1
-                            try applyAutosaveRetention(in: projectFolder, now: now)
-                        } else {
-                            result.unchanged += 1
-                        }
-                        if enrolledPath != canonicalSource {
-                            let data = try JSONEncoder().encode(canonicalSource)
-                            try data.write(to: enrollment, options: .atomic)
-                        }
-                        if let kept = matchingSnapshot ?? (fileManager.fileExists(atPath: destination.path) ? destination : nil) {
-                            archivedSnapshots[cacheKey] = (modified, size, kept)
-                        }
-                    }
+        return try withScopedAccess(to: watchURL) {
+            try withScopedAccess(to: archiveURL) {
+                let watchPath = PVProjectFolders.canonical(watchURL), archivePath = PVProjectFolders.canonical(archiveURL)
+                guard watchPath != archivePath, !watchPath.hasPrefix(archivePath + "/") else {
+                    throw NSError(domain: "PremiereVersions", code: 20, userInfo: [NSLocalizedDescriptionKey: PVL("Папка наблюдения не должна совпадать с архивом или находиться внутри него.")])
                 }
-            }
-        } catch {
-            throw error
-        }
-        return result
-    }
-
-    /// Retains the newest 10 copies, then hourly samples for the previous 12 hours,
-    /// then daily samples for the previous 5 days. Older copies are removed.
-    private func applyAutosaveRetention(in folder: URL, now: Date) throws {
-        guard let files = try? fileManager.contentsOfDirectory(
-            at: folder,
-            includingPropertiesForKeys: [.contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        ).filter({ $0.pathExtension.lowercased() == "prproj" }) else { return }
-
-        let sorted = files.compactMap { file -> (URL, Date)? in
-            guard let date = try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else {
-                return nil
-            }
-            return (file, date)
-        }.sorted { $0.1 == $1.1 ? $0.0.path < $1.0.path : $0.1 > $1.1 }
-
-        var keep = [String: BackupStatus]()
-        // Keep 10 most recent snapshots.
-        for item in sorted.prefix(BackupPolicy.recentCount) { keep[item.0.path] = .recent }
-
-        // Hourly snapshots between 10 copies and 12 hours.
-        var hourlyBuckets = Set<Int>()
-        for (file, date) in sorted {
-            let age = now.timeIntervalSince(date)
-            guard age > BackupPolicy.minimumHourlyAge, age <= Double(BackupPolicy.hourlyHours) * 60 * 60 else { continue }
-            let bucket = Int(age / 3600)
-            if hourlyBuckets.insert(bucket).inserted {
-                if keep[file.path] == nil { keep[file.path] = .hourly }
-            }
-        }
-
-        // Daily snapshots for days 1 through 5, beyond the hourly window.
-        var dailyBuckets = Set<Int>()
-        for (file, date) in sorted {
-            let age = now.timeIntervalSince(date)
-            guard age > Double(BackupPolicy.hourlyHours) * 60 * 60, age <= Double(BackupPolicy.dailyDays) * 24 * 60 * 60 else { continue }
-            let bucket = Int(age / (24 * 60 * 60))
-            if dailyBuckets.insert(bucket).inserted {
-                if keep[file.path] == nil { keep[file.path] = .daily }
-            }
-        }
-
-        let project = folder.lastPathComponent
-        // Preserve modification dates: they are the snapshot time and retention input.
-        // Migrate only known app-generated names; never rename arbitrary user files.
-        for (file, date) in sorted {
-            guard let status = keep[file.path], BackupNaming.isManaged(file.lastPathComponent, project: project) else { continue }
-            let target = folder.appendingPathComponent(BackupNaming.filename(project: project, modified: date, status: status))
-            if target != file {
-                guard !fileManager.fileExists(atPath: target.path) else {
-                    throw NSError(domain: "PremiereVersions", code: 42, userInfo: [NSLocalizedDescriptionKey: PVL("Совпадают имена резервных копий: ") + target.lastPathComponent + PVL(". Обе копии сохранены.")])
+                let candidates = try (indexedFiles ?? ProjectFileIndex().projects(in: watchURL, excluding: [archiveURL], cancellation: cancellation)).filter { !ProjectSourceFilter.isExcluded($0) }
+                result.found = candidates.count
+                for source in candidates {
+                    try cancellation?.check()
+                    do {
+                        let values = try source.resourceValues(forKeys: [.isRegularFileKey, .creationDateKey, .contentModificationDateKey, .fileSizeKey])
+                        guard values.isRegularFile == true, let modified = values.contentModificationDate,
+                              (values.fileSize ?? 0) > 0, now.timeIntervalSince(modified) >= BackupPolicy.stableDelay else { result.waiting += 1; continue }
+                        let selected = selectedProject.map { PVProjectFolders.canonical($0) == PVProjectFolders.canonical(source) } ?? false
+                        let known = PVProjectFolders.shared.existing(for: source, archive: archiveURL) != nil
+                        let legacy = archiveURL.appendingPathComponent(source.deletingPathExtension().lastPathComponent)
+                        let unclaimed = !fileManager.fileExists(atPath: legacy.appendingPathComponent(".pv-source.json").path)
+                        let hasLegacy = unclaimed && ((try? fileManager.contentsOfDirectory(at: legacy, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []).contains { BackupNaming.isManaged($0.lastPathComponent, project: source.deletingPathExtension().lastPathComponent) }
+                        guard selected || known || hasLegacy || BackupPolicy.acceptsCreation(values.creationDate, now: now) else { result.outsideCreationWindow += 1; continue }
+                        let folder = try PVProjectFolders.shared.folder(for: source, archive: archiveURL, allowLegacyClaim: hasLegacy)
+                        switch try archiveEngine.process(source: source, folder: folder, now: now) {
+                        case .copied: result.copied += 1
+                        case .unchanged: result.unchanged += 1
+                        case .waiting: result.waiting += 1
+                        }
+                        if copyNative {
+                            do {
+                                switch try nativeEngine.process(project: source, archiveFolder: folder, now: now) {
+                                case .copied: result.nativeCopied += 1
+                                case .waiting: result.nativeWaiting += 1
+                                case .missing, .unchanged: break
+                                }
+                            } catch PVBackupFailure.changingSource { result.nativeWaiting += 1 }
+                            catch { result.failed += 1 }
+                        }
+                    } catch PVBackupFailure.changingSource { result.waiting += 1 }
+                    catch { result.failed += 1 }
                 }
-                try fileManager.moveItem(at: file, to: target)
+                return result
             }
-        }
-        for (file, _) in sorted where keep[file.path] == nil {
-            try fileManager.removeItem(at: file)
         }
     }
 

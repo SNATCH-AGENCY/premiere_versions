@@ -76,6 +76,9 @@ struct ContentView: View {
     @StateObject private var projectWatcher = PVProjectWatcher()
     @StateObject private var settingsScroll = PVScrollMemory()
     @StateObject private var manualVersions = PVManualVersionIndex()
+    @StateObject private var hotKeyHelper = PVHotKeyHelperManager.shared
+    @AppStorage("hotKeyHelperEnabled") private var hotKeyHelperEnabled = true
+    @State private var confirmDisableHelper = false
     @State private var stageFocusTask: Task<Void, Never>?
     @AppStorage("logoVariant") private var logoVariant = "signature-dark"
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -91,6 +94,7 @@ struct ContentView: View {
     @AppStorage("autosaveMonitoringEnabled")
     private var autosaveMonitoringEnabled = false
 
+    @AppStorage("copyPremiereAutosave") private var copyPremiereAutosave = true
     @AppStorage("searchMode") private var searchMode = "all"
 
     @EnvironmentObject private var autosaveMonitor: AutosaveMonitor
@@ -174,6 +178,7 @@ struct ContentView: View {
         .background { PVEscapeCapture(action: handleEscape) }
         .background { PVWindowVisibility(visible: $visibleWindow) }
         .environment(\.locale, Locale(identifier: interfaceLanguage == "ru" ? "ru" : "en"))
+        .onChange(of: hotKey.shortcut) { _, _ in Task { await hotKeyHelper.syncShortcut() } }
         .onChange(of: logoVariant) { _, _ in PVBrand.applySelectedIcon(allowIconAccessPrompt: true) }
         .onChange(of: userLogos.revision) { _, _ in PVBrand.applySelectedIcon(allowIconAccessPrompt: true) }
         .onChange(of: focusedField) { _, target in
@@ -806,6 +811,10 @@ struct ContentView: View {
                             .font(.system(size: 11)).foregroundStyle(theme.muted)
                     }
                 }
+                Toggle(PVL("Копировать последний автосейв Premiere"), isOn: $copyPremiereAutosave)
+                    .toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
+                Text(PVL("10 снимков с шагом 5 минут · 12 часовых · 5 дневных"))
+                    .font(.system(size: 10)).foregroundStyle(theme.muted)
                 Text(PVL("Новые проекты: последние 48 ч · работает без интернета"))
                     .font(.system(size: 10)).foregroundStyle(theme.muted)
                 Text(PVL(autosaveMonitor.status))
@@ -888,6 +897,22 @@ struct ContentView: View {
                     .toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
                 Toggle(PVL("Показывать значок в строке меню"), isOn: Binding(get: { menuBarIconEnabled }, set: { value in if !value { showInDock = true }; menuBarIconEnabled = value }))
                     .toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
+                Toggle(PVL("Горячая клавиша после выхода"), isOn: Binding(get: { hotKeyHelperEnabled }, set: { value in
+                    if value { Task { await hotKeyHelper.enable(true) } }
+                    else { confirmDisableHelper = true }
+                })).toggleStyle(.switch).controlSize(.mini).tint(theme.mint)
+                .alert(PVL("Отключить Premiere Versions Helper?"), isPresented: $confirmDisableHelper) {
+                    Button(PVL("Отмена"), role: .cancel) { }
+                    Button(PVL("Подтвердить"), role: .destructive) { Task { await hotKeyHelper.enable(false) } }
+                } message: {
+                    Text(PVL("После выхода из Premiere Versions горячая клавиша перестанет открывать программу. Резервные копии создаются, пока сама программа работает."))
+                }
+                Text(PVL("Premiere Versions Helper открывает программу по горячей клавише из Premiere Pro после полного выхода."))
+                    .font(.system(size: 10)).foregroundStyle(theme.muted)
+                Text(PVL(hotKeyHelper.message)).font(.system(size: 10)).foregroundStyle(theme.muted)
+                if hotKeyHelper.needsApproval {
+                    Button(PVL("Разрешить в macOS")) { hotKeyHelper.openApproval() }.buttonStyle(PVQuietButtonStyle())
+                }
                 Text(PVL("Значок Dock")).font(.system(size: 13, weight: .medium))
                 logoChoices
                 persistentIconAccess
@@ -1319,7 +1344,9 @@ struct ContentView: View {
         guard !projectName.isEmpty else { manualVersions.invalidate(); return }
         do {
             try withArchiveAccess { archiveURL in
-                try manualVersions.refresh(project: projectName, archive: archiveURL)
+                guard let source = sourceProjectURL else { manualVersions.invalidate(); return }
+                let folder = try PVProjectFolders.shared.folder(for: source, archive: archiveURL, create: false, allowLegacyClaim: true)
+                try manualVersions.refresh(project: projectName, archive: archiveURL, directory: folder)
             }
         } catch { manualVersions.invalidate() }
     }
@@ -1343,7 +1370,7 @@ struct ContentView: View {
         do {
             try withScopedAccess(to: sourceURL) {
                 try withArchiveAccess { archiveURL in
-                    let projectFolder = archiveURL.appendingPathComponent(projectName, isDirectory: true)
+                    let projectFolder = try PVProjectFolders.shared.folder(for: sourceURL, archive: archiveURL, allowLegacyClaim: true)
                     try fileManager.createDirectory(
                         at: projectFolder,
                         withIntermediateDirectories: true
@@ -1582,8 +1609,8 @@ private final class ShortcutCaptureNSView: NSView {
 }
 
 nonisolated enum AppRelease {
-    static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "4.6" }
-    static var build: String { Bundle.main.infoDictionary?["PVBuildNumber"] as? String ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "2" }
+    static var version: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "4.7" }
+    static var build: String { Bundle.main.infoDictionary?["PVBuildNumber"] as? String ?? Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1" }
     static var label: String { version + " · Build " + build }
     static let author = "pewakkk"
 }
@@ -1684,12 +1711,14 @@ private struct PVHelpView: View {
             Divider().overlay(theme.border)
             section(PVL("Первый запуск"), PVL("Обычный запуск и клик по Dock открывают окно поверх других окон. После установки или обновления появляется приветствие. Сочетание работает только когда Premiere Pro — активное приложение. Enter или прокрутка вниз открывают главный экран. Панели открываются наведением или сразу по нажатию и закрываются при уходе мыши. Настройки из Check updates и редактор логотипа открываются в центре окна. В настройках можно включить монохромный значок строки меню: нажатие открывает программу, правое нажатие — меню выхода. Esc закрывает панель, возвращает к версии или скрывает главное окно в фон."))
             section(PVL("Сохранение"), PVL("Версия → Enter → комментарий → Enter. Прокрутка вниз открывает комментарий, вверх возвращает к версии. Возврат также — ← version или Esc. Комментарий необязателен. Копируется файл на диске: сначала сохрани изменения в Premiere. Ручные версии автоматически не удаляются. Кнопки press return работают и мышью."))
-            section(PVL("Резервные копии"), PVL("Проверка раз в \(Int(BackupPolicy.checkInterval)) с; файл должен быть стабилен \(Int(BackupPolicy.stableDelay)) с. Файлы и папки с autosave / auto-save / auto save, готовые автосейвы Premiere и наши архивы пропускаются. Имя содержит статус recent/hourly/daily, местную дату изменения проекта и окончание autosave."))
-            section(PVL("Новые проекты"), PVL("Автоматический поиск начинает копирование проектов, созданных за последние \(BackupPolicy.newProjectHours) часов. Считается дата создания файла, а не его последнего изменения. Для уже принятых под наблюдение проектов копирование продолжается и позже. Старые файлы не создают новые папки. Поиск и копирование работают без интернета; при следующей проверке находятся и проекты, созданные в отсутствие связи. Исходные файлы и прежние копии не удаляются."))
-            section(PVL("Хранение"), PVL("recent — \(BackupPolicy.recentCount) последних; hourly — почасовые за \(BackupPolicy.hourlyHours) часов; daily — дневные за \(BackupPolicy.dailyDays) дней. После новой копии обновляются статусы и удаляются лишние файлы только в резервном архиве."))
-            section(PVL("Доступ и фон"), PVL("Поиск — на разрешённых дисках или в выбранной папке. Статус внизу открывает только резервное копирование; шестерёнка — настройки: папки, значки, затем тот же блок копирования. Изменения синхронизированы. Закрытие — Esc или нажатие снаружи. Программа работает до полного выхода; автозапуска пока нет."))
+            section(PVL("Резервные копии"), PVL("Проверка раз в \(Int(BackupPolicy.checkInterval)) с. Первый снимок создаётся сразу; следующие — не чаще раза в \(Int(BackupPolicy.snapshotInterval / 60)) минут при изменении содержимого. Файл должен быть стабилен \(Int(BackupPolicy.stableDelay)) с. Копия проверяется до замены старых файлов; сбой или изменение источника сохраняет предыдущий бэкап. Дата в имени — время создания снимка."))
+            section(PVL("Новые проекты"), PVL("Новые проекты автоматически принимаются по дате создания за последние \(BackupPolicy.newProjectHours) часов. Выбранный вручную проект защищён независимо от возраста. Для уже отслеживаемых проектов копирование продолжается и позже. Интернет не нужен. Одноимённые проекты из разных мест получают отдельные постоянные папки: имя, имя_1, имя_2."))
+            section(PVL("Хранение"), PVL("recent — \(BackupPolicy.recentCount) последних разных состояний; hourly — \(BackupPolicy.hourlyHours) часовых точек; daily — \(BackupPolicy.dailyDays) дневных. Одна физическая копия может обслуживать несколько точек. Одинаковые файлы не вытесняют историю. Удаляются только известные программе копии, больше не нужные ни одному уровню, после успешной новой записи."))
+            section(PVL("Доступ и фон"), PVL("Поиск — на разрешённых дисках или в выбранной папке. Статус внизу открывает только резервное копирование; шестерёнка — настройки: папки, значки, затем тот же блок копирования. Изменения синхронизированы. Закрытие — Esc или нажатие снаружи. Копирование работает, пока основная программа запущена. Закрытие окна его не останавливает; полный выход останавливает."))
             section(PVL("Выбор проекта"), PVL("Если проект не выбран или недоступен, выбери файл на отдельном экране. После выбора Enter или прокрутка вниз открывают версию. Название проекта со стрелкой вверх возвращает к выбору; прокрутка вверх с версии туда не ведёт. Удалённый проект больше не считается активным."))
             section(PVL("Настройки и обновления"), PVL("Прокрутка настроек сохраняется на 10 секунд после закрытия. Значок Dock можно скрыть, сохранив доступ через строку меню. Проверки обновлений идут в фоне при запуске и раз в 6 часов; коралловая точка сообщает о новой версии. Установка остаётся ручной."))
+            section(PVL("Автосейв Premiere"), PVL("По желанию программа читает соседнюю папку Adobe Premiere Pro Auto-Save и сохраняет одну последнюю копию именно этого проекта в одноимённой подпапке своего архива. Оригиналы Premiere не меняются. Предыдущая зеркальная копия удаляется только после успешного создания новой. Если папки нет или доступ не разрешён, свои снимки продолжают работать."))
+            section(PVL("Фоновый вызов"), PVL("Отдельный помощник может запускать программу сочетанием после полного выхода. Он работает только при активном Premiere Pro и использует выбранное сочетание. macOS может потребовать разрешить фоновую работу. Помощник не выполняет резервное копирование: для него основная программа должна быть запущена."))
             section(PVL("Прозрачность"), PVL("В настройках можно менять плотность фона от 15% до 100%. При уменьшении за окном остаётся матовое размытие, текст и кнопки сохраняют читаемость. Выбор запоминается. При включённом уменьшении прозрачности в macOS используется непрозрачный фон."))
             section(PVL("Клавиши и логотип"), PVL("Сейчас: \(hotKey.shortcut.display). Сочетание работает в активном Premiere Pro. При записи используется английская раскладка, прежняя возвращается после завершения. Наведение открывает настройки; запись начинается отдельным нажатием. Встроенные логотипы находятся в приложении. Выбор Dock и два пользовательских варианта сохраняются между версиями. Выбранный значок сохраняется и для закрытого приложения после разрешения доступа к папке программы. При обновлении он применяется к запущенной новой версии, старые архивные приложения не меняются."))
             Divider().overlay(theme.border)

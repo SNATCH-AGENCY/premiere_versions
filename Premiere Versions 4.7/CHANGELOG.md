@@ -1,3 +1,11 @@
+# 4.7 Build 1
+
+- Smarter backup history: ten recent changed states at five-minute intervals, twelve hourly and five daily checkpoints share copies without duplicate content.
+- Optional protection for the latest matching Premiere Pro autosave, kept separately from the utility’s checkpoints.
+- Selected projects stay protected at any age; equally named projects from different locations receive separate, remembered archive folders.
+- An optional background shortcut helper opens the utility from active Premiere Pro even after the utility has quit.
+- Safer copy verification and cleanup, with fewer repeated directory reads.
+
 # 4.6 Build 2
 
 - Only newly discovered projects created within 48 hours start automatic backups; enrolled projects stay protected. Backups work offline.

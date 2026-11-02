@@ -24,7 +24,7 @@ The shortcut can be changed in Settings. You can also open the utility from the 
 
 ## Which projects get automatic backups?
 
-New automatic discovery uses the **file creation date within the last 48 hours**, not the last edit date. Older unrelated projects do not create new archive folders. If creation time is unavailable, an untracked file is skipped. Projects already enrolled, including existing managed backup archives, continue to be backed up afterwards.
+New automatic discovery uses the **file creation date within the last 48 hours**, not the last edit date. The project you explicitly select is protected regardless of age. Older unrelated projects do not create new archive folders. If creation time is unavailable, an untracked file is skipped. Projects already enrolled, including existing managed backup archives, continue to be backed up afterwards.
 
 **No internet connection is needed for project discovery or copying.** The next scan can find projects created during an offline period, as long as they are still within the 48-hour window. The app must be running to monitor changes. Manual numbered saves remain available for projects of any age.
 
@@ -40,12 +40,25 @@ Choose English or Russian, your save locations and a built-in or custom icon. Yo
 
 The app quietly checks for updates at launch and every six hours. Use **Check updates** in Settings any time; you choose when to install. You can hide the Dock icon and keep the app in the menu bar instead.
 
+## How backup history works
+
+A first copy is made as soon as a stable saved project is found. Later changed states are copied no more often than once every **five minutes**. The archive keeps **10 recent different states**, **12 hourly checkpoints** and **5 daily checkpoints**. Checkpoints can share one physical file when the project has not changed, so an idle project does not fill your archive with duplicates.
+
+Completed copies are checked before old managed copies are removed. Original files and unrelated files are never rotated. Projects with the same name from different locations receive separate folders such as `Project`, `Project_1` and `Project_2`.
+
+The optional **latest Premiere autosave** switch keeps one matching file from the project's neighboring `Adobe Premiere Pro Auto-Save` folder. This copy has its own subfolder, separate from the utility's history. Premiere's original autosaves remain untouched.
+
+## Keep the shortcut available
+
+**Premiere Versions Helper**, the optional background shortcut helper, can open the installed utility after you quit it, while Premiere Pro is active. macOS may ask you to allow its background item. The helper only listens for the configured shortcut; **backup monitoring still requires the main utility to be running**. Your existing shortcut and preferences are preserved.
+
 ## Latest improvements
 
-- **A quieter backup archive.** Automatic discovery starts with projects created within 48 hours; enrolled projects stay protected afterwards. Backups and discovery work offline.
-- **Less disk activity.** Version history is cached between explicit refreshes instead of being reread during typing and animations.
-- **More reliable controls.** Clicking during a hover delay opens the panel immediately and avoids accidental dismissal.
-- General interface cleanup and stricter release privacy checks.
+- **Smarter backup history.** Ten recent changed states at five-minute intervals, twelve hourly checkpoints and five daily checkpoints share copies without filling the archive with identical files.
+- **Premiere Auto-Save protection.** Optionally keep the latest matching Premiere autosave in a separate folder alongside your backups.
+- **Reliable project organization.** Selected projects stay protected at any age; projects with the same name from different locations receive separate, remembered folders.
+- **A shortcut that stays available.** An optional background helper opens the utility from active Premiere Pro even after the utility has quit.
+- Safer copy verification and cleanup, plus reduced repeated disk reads.
 
 ## Your work stays yours
 

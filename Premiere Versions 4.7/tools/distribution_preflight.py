@@ -13,6 +13,9 @@ framework=app/'Contents/Frameworks/Sparkle.framework'
 if not framework.exists():errors.append('Sparkle.framework is not bundled.')
 else:
  if not list(framework.glob('Versions/*/XPCServices/Installer.xpc')):errors.append('Sparkle Installer XPC service missing.')
+helper=app/'Contents/Library/LoginItems/Premiere Versions Helper.app'
+if not helper.exists():errors.append('Hotkey login item missing.')
+elif subprocess.run(['codesign','--verify','--strict',str(helper)],capture_output=True).returncode:errors.append('Hotkey helper signature failed.')
 icon=app/'Contents/XPCServices/PVIconService.xpc'
 if not icon.exists():errors.append('Embedded icon service missing.')
 elif subprocess.run(['codesign','--verify','--strict',str(icon)],capture_output=True).returncode:errors.append('Icon service signature failed.')

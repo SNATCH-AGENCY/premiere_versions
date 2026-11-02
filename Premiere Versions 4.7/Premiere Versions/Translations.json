@@ -728,24 +728,24 @@
     "en": "Version → Return → comment → Return. Scroll down for a comment, up to return to version. You can also use ← version or Esc. Comments are optional. The on-disk file is copied: save your edits in Premiere first. Manual versions are never automatically deleted. The press return hints are clickable too."
   },
   {
-    "ru": "Проверка раз в %@ с; файл должен быть стабилен %@ с. Файлы и папки с autosave / auto-save / auto save, готовые автосейвы Premiere и наши архивы пропускаются. Имя содержит статус recent/hourly/daily, местную дату изменения проекта и окончание autosave.",
-    "en": "Checked every %@ s; files must be stable for %@ s. Files and folders named autosave / auto-save / auto save, existing Premiere autosaves and our archives are skipped. Filenames include recent/hourly/daily status, local project modification time and the autosave suffix."
+    "ru": "Проверка раз в %@ с. Первый снимок создаётся сразу; следующие — не чаще раза в %@ минут при изменении содержимого. Файл должен быть стабилен %@ с. Копия проверяется до замены старых файлов; сбой или изменение источника сохраняет предыдущий бэкап. Дата в имени — время создания снимка.",
+    "en": "Checks run every %@ seconds. The first snapshot is immediate; later changed contents are copied at most once every %@ minutes after %@ seconds of stability. Copying is verified before old files are replaced; failures or changing sources preserve the previous backup. Filename dates are snapshot creation times."
   },
   {
     "ru": "Хранение",
     "en": "Retention"
   },
   {
-    "ru": "recent — %@ последних; hourly — почасовые за %@ часов; daily — дневные за %@ дней. После новой копии обновляются статусы и удаляются лишние файлы только в резервном архиве.",
-    "en": "recent — last %@ copies; hourly — one per hour for %@ hours; daily — one per day for %@ days. After a new copy, statuses are updated and excess files are removed only from the backup archive."
+    "ru": "recent — %@ последних разных состояний; hourly — %@ часовых точек; daily — %@ дневных. Одна физическая копия может обслуживать несколько точек. Одинаковые файлы не вытесняют историю. Удаляются только известные программе копии, больше не нужные ни одному уровню, после успешной новой записи.",
+    "en": "recent keeps %@ different states; hourly keeps %@ hourly checkpoints; daily keeps %@ daily checkpoints. One physical copy can serve several checkpoints. Identical files do not displace useful history. Only known copies no longer needed by any level are removed, after a successful new snapshot."
   },
   {
     "ru": "Доступ и фон",
     "en": "Access and background"
   },
   {
-    "ru": "Поиск — на разрешённых дисках или в выбранной папке. Статус внизу открывает только резервное копирование; шестерёнка — настройки: папки, значки, затем тот же блок копирования. Изменения синхронизированы. Закрытие — Esc или нажатие снаружи. Программа работает до полного выхода; автозапуска пока нет.",
-    "en": "Search covers allowed drives or a selected folder. The footer opens backups only; the gear opens Settings: folders, icons, then the same backup controls. Changes stay synchronized. Esc or an outside click closes the panel. The app runs until you quit; launch at login is not available yet."
+    "ru": "Поиск — на разрешённых дисках или в выбранной папке. Статус внизу открывает только резервное копирование; шестерёнка — настройки: папки, значки, затем тот же блок копирования. Изменения синхронизированы. Закрытие — Esc или нажатие снаружи. Копирование работает, пока основная программа запущена. Закрытие окна его не останавливает; полный выход останавливает.",
+    "en": "Search covers allowed drives or a selected folder. The footer opens backups only; the gear opens Settings: folders, icons, then the same backup controls. Changes stay synchronized. Esc or an outside click closes the panel. Copying requires the main app to be running. Closing its window keeps copying active; quitting stops it."
   },
   {
     "ru": "Клавиши и логотип",
@@ -900,7 +900,91 @@
     "en": "New projects: last 48h · works offline"
   },
   {
-    "ru": "Автоматический поиск начинает копирование проектов, созданных за последние %@ часов. Считается дата создания файла, а не его последнего изменения. Для уже принятых под наблюдение проектов копирование продолжается и позже. Старые файлы не создают новые папки. Поиск и копирование работают без интернета; при следующей проверке находятся и проекты, созданные в отсутствие связи. Исходные файлы и прежние копии не удаляются.",
-    "en": "Automatic discovery starts backing up projects created in the last %@ hours, using file creation time rather than last modification time. Enrolled projects continue to be backed up afterwards. Older files do not create new folders. Discovery and copying work offline; the next scan can find projects created without a connection. Original files and existing backups are not deleted."
+    "ru": "Новые проекты автоматически принимаются по дате создания за последние %@ часов. Выбранный вручную проект защищён независимо от возраста. Для уже отслеживаемых проектов копирование продолжается и позже. Интернет не нужен. Одноимённые проекты из разных мест получают отдельные постоянные папки: имя, имя_1, имя_2.",
+    "en": "New projects are discovered by their creation date within the last %@ hours. A manually selected project is protected at any age. Enrolled projects remain protected afterwards. No internet is needed. Same-name projects from different locations receive separate persistent folders: name, name_1, name_2."
+  },
+  {
+    "ru": "Копировать последний автосейв Premiere",
+    "en": "Mirror the latest Premiere autosave"
+  },
+  {
+    "ru": "10 снимков с шагом 5 минут · 12 часовых · 5 дневных",
+    "en": "10 states at 5-minute intervals · 12 hourly · 5 daily"
+  },
+  {
+    "ru": " · копий Premiere: %@",
+    "en": " · Premiere copies: %@"
+  },
+  {
+    "ru": " · ошибок копирования: %@",
+    "en": " · copy errors: %@"
+  },
+  {
+    "ru": "Горячая клавиша после выхода",
+    "en": "Shortcut after quitting"
+  },
+  {
+    "ru": "Разрешить в macOS",
+    "en": "Allow in macOS"
+  },
+  {
+    "ru": "Помощник доступен после установки в «Программы»",
+    "en": "Install in Applications to enable the helper"
+  },
+  {
+    "ru": "Разреши фоновую работу в настройках macOS",
+    "en": "Allow background activity in macOS Settings"
+  },
+  {
+    "ru": "Сочетание работает и после полного выхода",
+    "en": "The shortcut also works after quitting"
+  },
+  {
+    "ru": "Для вызова после выхода нужен фоновый помощник",
+    "en": "A background helper is needed to launch after quitting"
+  },
+  {
+    "ru": "Не удалось включить помощник: ",
+    "en": "Could not enable the helper: "
+  },
+  {
+    "ru": "Не удалось сохранить сочетание для помощника",
+    "en": "Could not save the helper shortcut"
+  },
+  {
+    "ru": "Автосейв Premiere",
+    "en": "Premiere autosave"
+  },
+  {
+    "ru": "Фоновый вызов",
+    "en": "Background launcher"
+  },
+  {
+    "ru": "По желанию программа читает соседнюю папку Adobe Premiere Pro Auto-Save и сохраняет одну последнюю копию именно этого проекта в одноимённой подпапке своего архива. Оригиналы Premiere не меняются. Предыдущая зеркальная копия удаляется только после успешного создания новой. Если папки нет или доступ не разрешён, свои снимки продолжают работать.",
+    "en": "Optionally, the app reads the adjacent Adobe Premiere Pro Auto-Save folder and keeps one latest matching project copy in a separate subfolder of its archive. Premiere originals are never changed. The previous mirror is removed only after the replacement succeeds. If the folder is missing or inaccessible, regular snapshots continue."
+  },
+  {
+    "ru": "Отдельный помощник может запускать программу сочетанием после полного выхода. Он работает только при активном Premiere Pro и использует выбранное сочетание. macOS может потребовать разрешить фоновую работу. Помощник не выполняет резервное копирование: для него основная программа должна быть запущена.",
+    "en": "A separate helper can launch the app with your shortcut after quitting. It listens only while Premiere Pro is active and uses your chosen shortcut. macOS may require background activity approval. The helper does not perform backups: those require the main app to be running."
+  },
+  {
+    "ru": "Отключить Premiere Versions Helper?",
+    "en": "Disable Premiere Versions Helper?"
+  },
+  {
+    "ru": "Подтвердить",
+    "en": "Confirm"
+  },
+  {
+    "ru": "После выхода из Premiere Versions горячая клавиша перестанет открывать программу. Резервные копии создаются, пока сама программа работает.",
+    "en": "After quitting Premiere Versions, the shortcut will no longer open the app. Backups require the main app to be running."
+  },
+  {
+    "ru": "Premiere Versions Helper открывает программу по горячей клавише из Premiere Pro после полного выхода.",
+    "en": "Premiere Versions Helper opens the app with its shortcut from Premiere Pro, even after quitting."
+  },
+  {
+    "ru": "Не удалось изменить работу помощника: ",
+    "en": "Could not change helper settings: "
   }
 ]

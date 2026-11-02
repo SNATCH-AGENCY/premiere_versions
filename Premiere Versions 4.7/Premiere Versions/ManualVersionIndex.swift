@@ -8,15 +8,17 @@ import Combine
 
     func invalidate() { numbers = nil }
 
-    func refresh(project: String, archive: URL, fileManager: FileManager = .default) throws {
+    func refresh(project: String, archive: URL, fileManager: FileManager = .default, directory: URL? = nil) throws {
         guard !project.isEmpty else { invalidate(); return }
         do {
-            let folder = archive.appendingPathComponent(project, isDirectory: true)
+            let folder = directory ?? archive.appendingPathComponent(project, isDirectory: true)
             guard fileManager.fileExists(atPath: folder.path) else { numbers = []; return }
             directoryReads += 1
             let files = try fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
-            let prefix = NSRegularExpression.escapedPattern(for: project)
-            let regex = try NSRegularExpression(pattern: "(?i)^" + prefix + #"_v(\d+)(?:_|\.|$)"#)
+            let metadata = try? Data(contentsOf: folder.appendingPathComponent(".pv-source.json"))
+            let aliases = metadata.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["names"] as? [String] ?? []
+            let prefix = ([project] + aliases).map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|")
+            let regex = try NSRegularExpression(pattern: "(?i)^(?:" + prefix + ")" + #"_v(\d+)(?:_|\.|$)"#)
             let found = files.compactMap { file -> Int? in
                 guard file.pathExtension.lowercased() == "prproj" else { return nil }
                 let name = file.lastPathComponent
