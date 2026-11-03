@@ -6,6 +6,8 @@ Premiere Versions is a small macOS companion for Adobe Premiere Pro. It keeps a 
 
 Its purpose is simple: **help protect important edits with deliberate version saves and automatic backup checkpoints.** Keeping those copies organized makes it easier to find a useful point to return to.
 
+![Image alt](https://github.com/SNATCH-AGENCY/premiere_versions/blob/main/Premiere-Versions-Wide-EN.png)
+
 ## A safety net for your projects
 
 - **Save important milestones.** Keep a numbered copy before a major change, a client revision or a new direction. Add a short comment so you remember what changed.
@@ -21,6 +23,10 @@ Its purpose is simple: **help protect important edits with deliberate version sa
 4. With Premiere Pro active, press **Option+S**, choose the same project that is active in Premiere, choose a version number, then press Return. Add an optional comment and press Return again. Premiere saves the project before the archive copy is created.
 
 The shortcut can be changed in Settings. You can also open the utility from its menu bar icon or the Dock.
+
+
+![Image alt](https://github.com/SNATCH-AGENCY/premiere_versions/blob/main/Premiere-Versions-Card-EN.png)
+
 
 ## Which projects get automatic backups?
 
