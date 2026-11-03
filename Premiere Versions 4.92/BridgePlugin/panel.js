@@ -1,0 +1,5 @@
+const button=document.getElementById('open'), label=document.getElementById('label');
+button.disabled=true; let language='en';
+window.__adobe_cep__.addEventListener('dev.premiereversions.state',event=>{try{const state=JSON.parse(event.data);language=state.language==='ru'?'ru':'en';button.disabled=!state.connected;label.textContent=state.connected?(language==='ru'?'Сохранить версию':'Save version'):(language==='ru'?'Открой Premiere Versions':'Open Premiere Versions');}catch(_){button.disabled=true;}});
+window.__adobe_cep__.dispatchEvent(JSON.stringify({type:'dev.premiereversions.request-language',scope:'APPLICATION',data:''}));
+button.addEventListener('click',()=>{if(!button.disabled)window.__adobe_cep__.dispatchEvent(JSON.stringify({type:'dev.premiereversions.open',scope:'APPLICATION',data:''}));});

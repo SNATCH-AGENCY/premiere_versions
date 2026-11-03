@@ -1,0 +1,16 @@
+{
+  "identifier": "dev.premiereversions.bridge",
+  "version": "4.92.1",
+  "files": {
+    "index.html": "ad6cc5333fb201b61a054bdf25688bc19f72a77ef72a82e999d2aedf7b0d26ec",
+    "core.js": "1c1b88fcd8034c98145ca9b2f19773b094df2a5e2de98f841af31597ba22e7d5",
+    "bridge.js": "2ace57d3244a9cb74cd3bd6aff66e54da25ea988f888b6f80932f7a9a886a3f5",
+    "mimetype": "6f4ece9eef5c4e518ad56a6f82d14e95f93e4e5d07b1cb8d22de8666d7ac3d7f",
+    "panel.js": "ed24c475ae7be9d979e8665401d6a2ae3aa4ace1ec883a2f47040d91eea3c218",
+    "host.jsx": "cac34eb50eee57c8af1fd512de22b6132dc08b30fa2ef07aa0cdc348e9cdd00f",
+    "panel.html": "9b72dd379b3582d1d1a510b9fd1a7268a788a0286abebea14eacb46eab517876",
+    "panel.css": "10f6d56650867b31d2d600f46619d24871deb86a1dd53b74340a881be5303049",
+    "META-INF/signatures.xml": "e5219197d2d62b216e1db6b9897118855f101579ca16d408fee863d3fc515d13",
+    "CSXS/manifest.xml": "f86927cb367388c4750bd961c1896f69cd8d3f210413f7b9504e7f8efe4c9f53"
+  }
+}
