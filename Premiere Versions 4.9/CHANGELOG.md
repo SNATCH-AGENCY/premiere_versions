@@ -1,3 +1,12 @@
+# 4.9 Build 1
+
+- **Simpler settings.** Essential controls stay visible; folder locations, appearance and backup details unfold on hover. Panels share consistent timing, larger targets and a quick route back to Settings.
+- **Background activity you control.** Quitting from Dock or with Command+Q keeps protection in the menu bar when enabled. Quit completely from the menu bar, or disable background activity to stop all background functions after quitting.
+- **Useful menu bar controls.** Open Settings and Backups, change backup mode, check for updates or quit completely.
+- **Updates beside the version.** Update status and the notification dot now live with version information. Help focuses on protecting and finding your work.
+- **One-click language switching.** A compact En/Ru button remembers your choice. English and Russian interface coverage has been checked.
+- General improvements to panel placement, control dragging, switch appearance and interface transitions.
+
 # 4.8 Build 1
 
 - New installations start in the menu bar without a Dock icon; existing visibility choices are preserved.
