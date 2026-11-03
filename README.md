@@ -16,11 +16,11 @@ Its purpose is simple: **help protect important edits with deliberate version sa
 ## Get started
 
 1. Download the **DMG installer** from [Releases](https://github.com/pewakkk/premiere_versions/releases/latest), open it and **drag Premiere Versions.app onto Applications**. Open the app from Applications, then eject the installer.
-2. Choose your Premiere project and allow access to the folders you want to use. Choose Auto backup mode in Settings.
+2. Choose your Premiere project and allow access to the folders you want to use. Choose Auto in the Backups panel.
 3. Save your latest changes in Premiere Pro with **Command+S**.
 4. With Premiere Pro active, press **Option+S**, choose a version number, then press Return. Add an optional comment and press Return again to keep the copy.
 
-The shortcut can be changed in Settings. You can also open the utility from the Dock or enable its optional menu bar icon.
+The shortcut can be changed in Settings. You can also open the utility from its menu bar icon or the Dock.
 
 ## Which projects get automatic backups?
 
@@ -38,7 +38,7 @@ Keep your media backed up too. For protection against a drive failure, choose a 
 
 Choose English or Russian, your save locations and a built-in or custom icon. Your choices stay with you when you update.
 
-The app quietly checks for updates at launch and every six hours. Use **Check updates** in Settings any time; you choose when to install. You can hide the Dock icon and keep the app in the menu bar instead.
+The app quietly checks for updates at launch and every six hours. Open the version label and use **Check updates** any time; you choose when to install. You can hide the Dock icon and keep the app in the menu bar instead.
 
 ## How backup history works
 
@@ -52,24 +52,30 @@ The optional **latest Premiere autosave** switch keeps one matching file from th
 
 **Auto** runs backups while Premiere Pro is open, including when it is minimized. Closing Premiere pauses the backup timer and file monitoring; a copy already in progress is completed safely. **Always** keeps monitoring while the utility is running. **Off** leaves manual backup creation available.
 
-The backup panel shows your selected project's latest copy and a button to reveal it in Finder. **Create backup now** checks only that project and can save a changed state before the automatic five-minute interval; identical content is not duplicated. Open **Details** for retention information and the optional Premiere autosave mirror.
+The backup panel shows your selected project's latest copy and a button to reveal it in Finder. **Create backup now** checks only that project and can save a changed state before the automatic five-minute interval; identical content is not duplicated. Hover over **Details** for retention information and the optional Premiere autosave mirror.
 
-## Ready when Premiere opens
+## Background activity
 
-New installations use the **menu bar without a Dock icon**. Click the menu bar icon to open the window, or use its right-click menu to quit. You can restore the Dock icon in Settings. Existing visibility choices are preserved when updating.
+New installations use the **menu bar without a Dock icon**. Click its icon to open the window; right-click for Settings, Backups, backup modes, updates and **Quit completely**. Existing icon choices stay saved when updating.
 
-**Premiere Versions Helper** keeps your shortcut available from active Premiere Pro after quitting the utility completely. Enable **Launch with Premiere Pro** to open the utility quietly in the background when Premiere starts. If you quit the utility intentionally, it stays closed until the next Premiere launch. Opening it manually or using its shortcut still shows its window.
+With **Background activity** on, quitting from Dock or with Command+Q hides the window and keeps the utility in the menu bar. Auto backups continue while Premiere Pro is running, and the shortcut works while Premiere Pro is active. Opening the utility restores your preferred icon locations. Use **Quit completely** in the menu bar for a full exit.
 
-The helper must be enabled and allowed by macOS. It does not copy projects itself; the main utility performs backups. An existing disabled backup preference stays Off when updating; existing enabled monitoring becomes Auto. Your folder locations and other choices stay saved.
+With Background activity off, quitting stops the utility and its helper. The shortcut and automatic launch remain unavailable until you open it manually. **Launch with Premiere Pro** is available only with background activity enabled. macOS may ask you to allow background activity.
+
+At least one icon location stays enabled. Hiding the Dock icon keeps the menu bar route available.
+
+## A quieter interface
+
+Essential settings stay visible. Hover over folder locations or appearance to unfold them, or follow a shortcut to Backups, keyboard shortcuts or version information. Panels open on hover and close after you leave; Escape or a click outside closes them immediately. The compact **En/Ru** button switches languages with one click and remembers your choice.
 
 ## Latest improvements
 
-- **A simpler backup panel.** See protection status and your selected project's latest backup, create a copy or reveal its file. Additional information stays under Details.
-- **Off, Auto or Always.** Auto backs up while Premiere Pro is running and pauses file monitoring when it closes. A copy already in progress finishes safely.
-- **Ready when you edit.** Optionally launch the utility quietly with Premiere Pro. If you quit it intentionally, it stays closed until the next Premiere launch.
-- **Clearer recovery.** Understand when a drive is unavailable, folder access is needed or a project cannot be found, with a relevant next action.
-- **A backup on demand.** Create a copy of the selected project without searching the computer. Identical content is not duplicated.
-- General interface, localization and background activity improvements.
+- **Simpler settings.** Essential controls stay visible; folder locations, appearance and backup details unfold on hover. Panels share consistent timing, larger targets and a quick route back to Settings.
+- **Background activity you control.** Quitting from Dock or with Command+Q keeps protection in the menu bar when enabled. Quit completely from the menu bar, or disable background activity to stop all background functions after quitting.
+- **Useful menu bar controls.** Open Settings and Backups, change backup mode, check for updates or quit completely.
+- **Updates beside the version.** Update status and the notification dot now live with version information. Help focuses on protecting and finding your work.
+- **One-click language switching.** A compact En/Ru button remembers your choice. English and Russian interface coverage has been checked.
+- General improvements to panel placement, control dragging, switch appearance and interface transitions.
 
 ## Your work stays yours
 

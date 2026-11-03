@@ -9,6 +9,7 @@ import ServiceManagement
     @Published private(set) var needsApproval = false
     @Published private(set) var enabled = false
     private var observer: NSObjectProtocol?
+    private var operation: Task<Void, Never>?
     private var currentBuild: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "" }
     private var installed: Bool {
         let parent = Bundle.main.bundleURL.resolvingSymlinksInPath().deletingLastPathComponent()
@@ -19,7 +20,7 @@ import ServiceManagement
         if observer == nil {
             observer = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.refresh() } }
         }
-        guard UserDefaults.standard.object(forKey: "hotKeyHelperEnabled") as? Bool ?? true else { refresh(); return }
+        guard UserDefaults.standard.object(forKey: "hotKeyHelperEnabled") as? Bool ?? true else { Task { await enable(false) }; return }
         Task { await enable(true) }
     }
     func refresh() {
@@ -30,34 +31,64 @@ import ServiceManagement
     }
     func enable(_ value: Bool) async {
         UserDefaults.standard.set(value, forKey: "hotKeyHelperEnabled")
+        let previous = operation
+        let task = Task { @MainActor in
+            await previous?.value
+            guard (UserDefaults.standard.object(forKey: "hotKeyHelperEnabled") as? Bool ?? true) == value else { return }
+            await applyEnabled(value)
+        }
+        operation = task
+        await task.value
+    }
+    private func applyEnabled(_ value: Bool) async {
         guard installed else { refresh(); return }
         do {
             if value {
-                // Refresh only when the helper implementation changes, not on every app build.
                 if PVHelperPolicy.needsRefresh(enabled: service.status == .enabled,
                     registeredVersion: UserDefaults.standard.integer(forKey: "hotKeyHelperImplementationVersion")) {
                     try await service.unregister()
                 }
+                // Store the policy before registration so a newly started helper cannot read stale settings.
+                guard await writeConfiguration(enabled: true) else { refresh(); message = PVL("Не удалось изменить работу в фоне"); return }
                 if service.status == .notRegistered || service.status == .notFound { try service.register() }
                 if service.status == .enabled || service.status == .requiresApproval {
                     UserDefaults.standard.set(PVHelperPolicy.implementationVersion, forKey: "hotKeyHelperImplementationVersion")
                     UserDefaults.standard.set(currentBuild, forKey: "hotKeyHelperRegisteredBuild")
-                    await syncShortcut()
                 }
-            } else if service.status == .enabled || service.status == .requiresApproval { try await service.unregister() }
+            } else {
+                _ = await writeConfiguration(enabled: false)
+                if service.status == .enabled || service.status == .requiresApproval { try await service.unregister() }
+            }
             refresh()
         } catch {
-            UserDefaults.standard.set(service.status == .enabled || service.status == .requiresApproval, forKey: "hotKeyHelperEnabled")
-            refresh(); message = PVL("Не удалось изменить работу помощника: ") + error.localizedDescription
+            refresh(); message = PVL("Не удалось изменить работу в фоне") + ": " + error.localizedDescription
+        }
+    }
+    /// Full exit suspends the helper without discarding the saved background preference.
+    func suspendForTermination() async -> Bool {
+        await operation?.value
+        guard installed else { return true }
+        let disabled = await writeConfiguration(enabled: false)
+        do {
+            if service.status == .enabled || service.status == .requiresApproval { try await service.unregister() }
+            return true
+        } catch {
+            refresh(); message = PVL("Не удалось завершить фоновую работу")
+            return disabled
         }
     }
     func syncShortcut() async {
+        let enabled = UserDefaults.standard.object(forKey: "hotKeyHelperEnabled") as? Bool ?? true
+        if !enabled { await enable(false); return }
+        guard await writeConfiguration(enabled: enabled) else { message = PVL("Не удалось сохранить сочетание для помощника"); return }
+    }
+    private func writeConfiguration(enabled: Bool) async -> Bool {
         guard installed, let encoded = try? JSONEncoder().encode(SavedShortcut.load()),
-              var config = try? JSONDecoder().decode(PVHelperShortcut.self, from: encoded) else { return }
-        config.launchWithPremiere = UserDefaults.standard.object(forKey: "launchWithPremiere") as? Bool ?? true
-        guard let data = try? JSONEncoder().encode(config) else { return }
-        let success = await PVHelperPreferencesWriter.configure(data)
-        if !success { message = PVL("Не удалось сохранить сочетание для помощника") }
+              var config = try? JSONDecoder().decode(PVHelperShortcut.self, from: encoded) else { return false }
+        config.backgroundEnabled = enabled
+        config.launchWithPremiere = enabled && (UserDefaults.standard.object(forKey: "launchWithPremiere") as? Bool ?? true)
+        guard let data = try? JSONEncoder().encode(config) else { return false }
+        return await PVHelperPreferencesWriter.configure(data)
     }
     func openApproval() { SMAppService.openSystemSettingsLoginItems() }
 }

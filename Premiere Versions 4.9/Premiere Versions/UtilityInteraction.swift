@@ -19,6 +19,7 @@ final class PVUtilityWindow: NSWindow {
     var escapeAction: (() -> Void)?
     private var escapeGate = PVEscapeGate()
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .scrollWheel { PVPanelInteraction.noteScroll() }
         if PVColorSampling.active {
             if event.type == .keyDown, event.keyCode == 53 {
                 _ = escapeGate.accept(time: event.timestamp, repeated: event.isARepeat)
@@ -48,6 +49,26 @@ final class PVEscapeView: NSView {
     override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); install() }
     func install() { (window as? PVUtilityWindow)?.escapeAction = action }
     func stop() { (window as? PVUtilityWindow)?.escapeAction = nil }
+}
+
+/// Only this explicit strip can move the window. Controls and panel surfaces never do.
+struct PVWindowDragRegion: NSViewRepresentable {
+    func makeNSView(context: Context) -> PVWindowDragView { PVWindowDragView() }
+    func updateNSView(_ view: PVWindowDragView, context: Context) {}
+}
+final class PVWindowDragView: NSView {
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+}
+
+/// Dragging a control or using a native picker suspends pointer-exit dismissal.
+@MainActor enum PVPanelInteraction {
+    private static var scrollingUntil = -Double.infinity
+    static func noteScroll(time: Double = ProcessInfo.processInfo.systemUptime) { scrollingUntil = time + 0.25 }
+    static func isScrolling(time: Double = ProcessInfo.processInfo.systemUptime) -> Bool { time < scrollingUntil }
+    static func isBusy(window: NSWindow?) -> Bool {
+        isScrolling() || PVColorSampling.active || NSEvent.pressedMouseButtons != 0 || window?.attachedSheet != nil || NSApp.modalWindow != nil
+    }
 }
 
 /// Starts the welcome animation only after the real window is visible and active.
@@ -212,11 +233,13 @@ struct PVInlineColorPicker: View {
         PVColorSampling.active = true; sampling = true
         let tool = NSColorSampler(); sampler = tool
         tool.show { picked in
-            PVColorSampling.active = false; sampling = false; sampler = nil
-            if let picked, let rgb = picked.usingColorSpace(.sRGB) {
-                color = Color(red: min(1, max(0, rgb.redComponent)),
-                              green: min(1, max(0, rgb.greenComponent)),
-                              blue: min(1, max(0, rgb.blueComponent)))
+            Task { @MainActor in
+                PVColorSampling.active = false; sampling = false; sampler = nil
+                if let picked, let rgb = picked.usingColorSpace(.sRGB) {
+                    color = Color(red: min(1, max(0, rgb.redComponent)),
+                                  green: min(1, max(0, rgb.greenComponent)),
+                                  blue: min(1, max(0, rgb.blueComponent)))
+                }
             }
         }
     }

@@ -18,6 +18,7 @@ import Darwin
     private var knownOwner: NSRunningApplication?
     private var launching = false
     private var autoLaunch = false
+    private var backgroundEnabled = true
     private var preferencesLoaded = false
     private var autoPolicy = PVAutoLaunchPolicy()
     private var autoTask: Task<Void, Never>?
@@ -61,7 +62,7 @@ import Darwin
     }
     private func reportTestState() {
         guard let root = testRoot else { return }
-        let value: [String: Any] = ["running": true, "mainRunning": mainRunning, "registered": hotKey != nil, "key": Int(shortcut.keyCode), "pid": Int(ProcessInfo.processInfo.processIdentifier), "auto": autoLaunch, "premiereCount": premiereProcesses.count, "launching": launching]
+        let value: [String: Any] = ["running": true, "mainRunning": mainRunning, "registered": hotKey != nil, "key": Int(shortcut.keyCode), "pid": Int(ProcessInfo.processInfo.processIdentifier), "auto": autoLaunch, "backgroundEnabled": backgroundEnabled, "premiereCount": premiereProcesses.count, "launching": launching]
         if let data = try? JSONSerialization.data(withJSONObject: value) { try? data.write(to: root.appendingPathComponent("helper-state.json"), options: .atomic) }
     }
     #endif
@@ -142,8 +143,9 @@ import Darwin
             if testRoot != nil {fallback=PVHelperShortcut(keyCode:UInt32(kVK_F20),modifiers:UInt32(cmdKey|optionKey|controlKey|shiftKey),keyLabel:"F20")}
             #endif
             let updated=stored?.isValid==true ? stored! : fallback
-            let justEnabled = !autoLaunch && updated.launchWithPremiere == true
-            autoLaunch = updated.launchWithPremiere == true; preferencesLoaded = true
+            backgroundEnabled = updated.backgroundEnabled != false
+            let justEnabled = !autoLaunch && updated.launchWithPremiere == true && backgroundEnabled
+            autoLaunch = updated.launchWithPremiere == true && backgroundEnabled; preferencesLoaded = true
             if updated != shortcut {unregister();shortcut=updated}
             considerAutomaticLaunch(justEnabled: justEnabled)
             refresh()
@@ -155,7 +157,7 @@ import Darwin
         #endif
         watchOwnerExit()
         considerAutomaticLaunch()
-        guard !launching, PVHelperPolicy.shouldListen(mainRunning: mainRunning, premiereActive: premiereActive) else { unregister(); return }
+        guard !launching, PVHelperPolicy.shouldListen(mainRunning: mainRunning, premiereActive: premiereActive, enabled: backgroundEnabled) else { unregister(); return }
         guard hotKey == nil else { return }
         let id = EventHotKeyID(signature: 0x5056484B, id: 1)
         let status = RegisterEventHotKey(shortcut.keyCode, shortcut.modifiers, id, GetApplicationEventTarget(), 0, &hotKey)
@@ -176,7 +178,7 @@ import Darwin
     }
     private func unregister() { if let hotKey { UnregisterEventHotKey(hotKey) }; hotKey = nil }
     private func pressed() {
-        guard !launching, PVHelperPolicy.shouldListen(mainRunning: mainRunning, premiereActive: premiereActive) else { refresh(); return }
+        guard !launching, PVHelperPolicy.shouldListen(mainRunning: mainRunning, premiereActive: premiereActive, enabled: backgroundEnabled) else { refresh(); return }
         launching = true; unregister()
         launchOwner(background: false)
     }

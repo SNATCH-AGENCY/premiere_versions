@@ -6,7 +6,7 @@ def build(root,app,owner_id,*,testing=False):
  root,app=Path(root),Path(app)
  helper=app/'Contents/Library/LoginItems/Premiere Versions Helper.app';binary=helper/'Contents/MacOS/Premiere Versions Helper';binary.parent.mkdir(parents=True,exist_ok=True)
  metadata=plistlib.loads((root/'AppMetadata.plist').read_bytes())
- info={'CFBundleIdentifier':owner_id+'.HotKeyHelper','CFBundleExecutable':'Premiere Versions Helper','CFBundleName':'Premiere Versions Helper','CFBundleDisplayName':'Premiere Versions Helper','CFBundlePackageType':'APPL','CFBundleVersion':os.environ.get('CURRENT_PROJECT_VERSION','4.8.1'),'CFBundleShortVersionString':os.environ.get('MARKETING_VERSION','4.8'),'LSUIElement':True,'LSMinimumSystemVersion':os.environ.get('MACOSX_DEPLOYMENT_TARGET','26.6.2'),'NSPrincipalClass':'NSApplication','PVOwnerBundleIdentifier':owner_id}
+ info={'CFBundleIdentifier':owner_id+'.HotKeyHelper','CFBundleExecutable':'Premiere Versions Helper','CFBundleName':'Premiere Versions Helper','CFBundleDisplayName':'Premiere Versions Helper','CFBundlePackageType':'APPL','CFBundleVersion':os.environ.get('CURRENT_PROJECT_VERSION','4.9.1'),'CFBundleShortVersionString':os.environ.get('MARKETING_VERSION','4.9'),'LSUIElement':True,'LSMinimumSystemVersion':os.environ.get('MACOSX_DEPLOYMENT_TARGET','26.6.2'),'NSPrincipalClass':'NSApplication','PVOwnerBundleIdentifier':owner_id}
  (helper/'Contents/Info.plist').write_bytes(plistlib.dumps(info))
  modules=Path(os.environ.get('DERIVED_FILE_DIR',str(app.parent)))/'PVHotKeyHelperModules'
  arch=os.environ.get('CURRENT_ARCH','arm64')

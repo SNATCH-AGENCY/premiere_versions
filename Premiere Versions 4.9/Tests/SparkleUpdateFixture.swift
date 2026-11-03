@@ -45,7 +45,15 @@ import Sparkle
     func showUpdateInstalledAndRelaunched(_ relaunched: Bool, acknowledgement: @escaping () -> Void) { acknowledgement() }
     func dismissUpdateInstallation() {}
 }
-@MainActor final class Delegate: NSObject, NSApplicationDelegate {
+@MainActor final class Delegate: NSObject, NSApplicationDelegate, SPUUpdaterDelegate {
+    private var relaunchReady = false
+    func updaterWillRelaunchApplication(_ updater: SPUUpdater) { relaunchReady = true }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // The same relaunch bypass used by the production background-quit policy.
+        let phase = Bundle.main.object(forInfoDictionaryKey: "PVFixturePhase") as? String
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        return phase == "bad" || version == "4.3.2" || relaunchReady ? .terminateNow : .terminateCancel
+    }
     let driver = Driver()
     var updater: SPUUpdater?
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -83,7 +91,7 @@ import Sparkle
             for (source, target) in [("current.png", "usercolor.png"), ("previous.png", "userprevcolor.png")] {
                 try Data(contentsOf: root().appendingPathComponent(source)).write(to: support.appendingPathComponent(target), options: .atomic)
             }
-            updater = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: driver, delegate: nil)
+            updater = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: driver, delegate: self)
             try updater!.start()
             updater!.checkForUpdates()
         } catch { fail(error) }

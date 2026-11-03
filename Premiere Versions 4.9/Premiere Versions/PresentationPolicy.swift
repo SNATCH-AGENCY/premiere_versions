@@ -10,3 +10,11 @@ import Foundation
         closedAt = nil
     }
 }
+
+@MainActor enum PVTerminationContext { static var updating = false }
+
+/// Retain menu navigation until the SwiftUI window has subscribed, including a cold launch.
+@MainActor final class PVPanelNavigation: ObservableObject {
+    static let shared = PVPanelNavigation()
+    @Published var request: String?
+}

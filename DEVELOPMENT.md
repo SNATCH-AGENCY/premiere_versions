@@ -57,3 +57,13 @@ Manual archive enumeration is triggered by project/save/reactivation events rath
 The existing sandboxed login item observes workspace application-list changes and process-exit events. Auto mode removes its timer and FSEvents stream when Premiere is absent; cancellation is observed between completed safe copies. Manual backup targets the selected source and preserves content deduplication. Helper launch settings use the fixed validated XPC preference channel; a short-lived one-use intent distinguishes quiet background launches from explicit opens. Refresh helper registration only when its implementation version changes, not for each app build.
 
 Before publication, run backup engine/mode checks, native interface checks and the isolated real workspace automatic-launch fixture in addition to the release privacy, signed update and icon service gates. Apple service lifecycle reference: https://developer.apple.com/documentation/servicemanagement/smappservice
+
+## Version 4.9 interaction and lifecycle
+
+Hover panels and sections share 150 ms open and 350 ms close delays. Nested sections change document height instead of overlaying following rows. Main-page anchors are captured from trigger geometry; settings-origin navigation inherits the current panel position. Picker, sheet, shortcut-recording and control-drag interactions suspend pointer-exit dismissal. Only the explicit header drag region moves the window.
+
+Normal quit enters status-only mode without overwriting visibility preferences. Full quit disables helper policy and unregisters the login item before exiting. Shutdown reasons and Sparkle's updaterWillRelaunchApplication callback bypass quit-to-background. Tests cover native termination, real disabled/enabled helper behavior, panel routes, both language templates and signed updates.
+
+Settings scroll memory remains valid for ten seconds after closing; that implementation detail is intentionally absent from in-app help.
+
+Premiere save synchronization is not enabled in this release. Adobe's Project.save API returns a completion result inside a Premiere UXP extension; the standalone utility has no such bridge yet. The installed Premiere AppleScript dictionary does not expose project saving. Keep the explicit save-first workflow rather than sending an unverified keyboard shortcut. Reference: https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/project

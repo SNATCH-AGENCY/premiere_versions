@@ -4,6 +4,7 @@ import AppKit
 struct PVLogoColorEditor: View {
     @ObservedObject var library: PVUserLogoLibrary
     let slot: String?
+    let showsHeading: Bool
     let saved: () -> Void
     let close: () -> Void
     @Environment(\.colorScheme) private var colorScheme
@@ -16,8 +17,9 @@ struct PVLogoColorEditor: View {
     @State private var saveTask: Task<Void, Never>?
     private var theme: PVTheme { PVTheme(dark: colorScheme == .dark) }
 
-    init(library: PVUserLogoLibrary, slot: String? = nil, saved: @escaping () -> Void, close: @escaping () -> Void) {
+    init(library: PVUserLogoLibrary, slot: String? = nil, showsHeading: Bool = true, saved: @escaping () -> Void, close: @escaping () -> Void) {
         self.slot = slot
+        self.showsHeading = showsHeading
         self.library = library
         self.saved = saved
         self.close = close
@@ -36,12 +38,12 @@ struct PVLogoColorEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
+            if showsHeading { HStack {
                 Text(PVL("Свой цвет")).font(.system(size: 19, weight: .semibold, design: .rounded))
                 Spacer()
                 Button(action: close) { Image(systemName: "xmark").font(.system(size: 11, weight: .medium)) }
                     .buttonStyle(PVQuietButtonStyle()).disabled(saving).accessibilityLabel(PVL("Закрыть конструктор"))
-            }
+            } }
             HStack(spacing: 24) {
                 VStack(spacing: 10) {
                     Group {
@@ -75,7 +77,7 @@ struct PVLogoColorEditor: View {
                 .buttonStyle(PVSaveButtonStyle()).disabled(saving || preview == nil)
             }
         }
-        .padding(18).frame(width: 470)
+        .padding(18).frame(maxWidth: .infinity)
         .foregroundStyle(theme.ink).background(theme.panel)
         .onExitCommand { close() }
         .onDisappear { saveTask?.cancel() }

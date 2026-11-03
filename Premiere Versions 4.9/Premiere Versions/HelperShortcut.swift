@@ -6,6 +6,7 @@ nonisolated struct PVHelperShortcut: Codable, Equatable {
     let modifiers: UInt32
     let keyLabel: String
     var launchWithPremiere: Bool? = nil
+    var backgroundEnabled: Bool? = nil
     static let `default` = Self(keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(optionKey), keyLabel: "S")
     var isValid: Bool {
         let allowed = UInt32(cmdKey | controlKey | optionKey | shiftKey)
@@ -15,7 +16,7 @@ nonisolated struct PVHelperShortcut: Codable, Equatable {
     }
 }
 nonisolated enum PVHelperPolicy {
-    static let implementationVersion = 2
+    static let implementationVersion = 3
     static func needsRefresh(enabled: Bool, registeredVersion: Int) -> Bool { enabled && registeredVersion != implementationVersion }
     static func shouldListen(mainRunning: Bool, premiereActive: Bool, enabled: Bool = true) -> Bool { enabled && !mainRunning && premiereActive }
 }

@@ -1,9 +1,0 @@
-from pathlib import Path
-import subprocess,tempfile
-root=Path(__file__).resolve().parents[1]
-source=(root/'Premiere Versions/UtilityInteraction.swift').read_text().split('/// Starts the welcome')[0]
-harness = '@main struct NativeEscapeChecks {\n @MainActor static func main() {\n  _ = NSApplication.shared\n  let window = PVUtilityWindow(contentRect:NSRect(x:-10000,y:-10000,width:100,height:100),styleMask:[.titled],backing:.buffered,defer:false)\n  let other = PVUtilityWindow(contentRect:NSRect(x:-10000,y:-10000,width:100,height:100),styleMask:[.titled],backing:.buffered,defer:false)\n  window.isReleasedWhenClosed=false;other.isReleasedWhenClosed=false\n  let view=PVEscapeView(frame:NSRect(x:0,y:0,width:100,height:100));window.contentView=view\n  var count=0;view.action={count += 1};view.install()\n  func send(_ target:PVUtilityWindow,_ time:Double,_ repeated:Bool=false) {\n   let event=NSEvent.keyEvent(with:.keyDown,location:.zero,modifierFlags:[],timestamp:time,windowNumber:target.windowNumber,context:nil,characters:"\\u{1b}",charactersIgnoringModifiers:"\\u{1b}",isARepeat:repeated,keyCode:53)!\n   target.sendEvent(event)\n  }\n  send(window,1)\n  send(window,1.1)\n  send(window,2,true)\n  other.escapeAction = {}\n  send(other,3)\n  send(window,4)\n  view.stop();window.close();other.close()\n  if count != 2 { print("FAIL: native Escape routing",count);exit(1) }\n  print("PASS: native window dispatch routes Escape before controls; separate windows and repeated/double presses are handled correctly")\n }\n}\n'
-with tempfile.TemporaryDirectory(prefix='pv43-native-escape-') as tmp:
-    p=Path(tmp);swift=p/'Checks.swift';swift.write_text(source+'\n'+harness)
-    subprocess.run(['xcrun','swiftc','-parse-as-library','-disable-sandbox','-swift-version','5','-default-isolation','MainActor','-module-cache-path',str(p/'modules'),str(swift),'-o',str(p/'Checks')],check=True)
-    subprocess.run([str(p/'Checks')],check=True)

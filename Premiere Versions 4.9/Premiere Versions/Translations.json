@@ -1126,5 +1126,133 @@
   {
     "ru": "Проверка приостановлена",
     "en": "Check paused"
+  },
+  {
+    "ru": "Завершить полностью",
+    "en": "Quit completely"
+  },
+  {
+    "ru": "Не удалось изменить работу в фоне",
+    "en": "Could not change background activity"
+  },
+  {
+    "ru": "Не удалось завершить фоновую работу",
+    "en": "Could not stop background activity"
+  },
+  {
+    "ru": "Вернуться в настройки",
+    "en": "Back to settings"
+  },
+  {
+    "ru": "%@ недавних состояний · %@ часовых · %@ дневных",
+    "en": "%@ recent states · %@ hourly · %@ daily"
+  },
+  {
+    "ru": "Работа в фоне",
+    "en": "Background activity"
+  },
+  {
+    "ru": "Значок программы",
+    "en": "App icon"
+  },
+  {
+    "ru": "Строка меню",
+    "en": "Menu bar"
+  },
+  {
+    "ru": "Отключить работу в фоне?",
+    "en": "Turn off background activity?"
+  },
+  {
+    "ru": "После завершения резервирование и горячая клавиша будут недоступны до ручного запуска программы.",
+    "en": "After quitting, backups and the shortcut will be unavailable until you open the app manually."
+  },
+  {
+    "ru": "После завершения продолжает работать в строке меню",
+    "en": "Keeps running in the menu bar after quitting"
+  },
+  {
+    "ru": "Завершение программы отключает все фоновые функции",
+    "en": "Quitting the app disables all background activity"
+  },
+  {
+    "ru": "Запускать с Premiere Pro",
+    "en": "Launch with Premiere Pro"
+  },
+  {
+    "ru": "Внешний вид",
+    "en": "Appearance"
+  },
+  {
+    "ru": "Выбрано",
+    "en": "Selected"
+  },
+  {
+    "ru": "Не выбрано",
+    "en": "Not selected"
+  },
+  {
+    "ru": "Все диски",
+    "en": "All drives"
+  },
+  {
+    "ru": "Папка",
+    "en": "Folder"
+  },
+  {
+    "ru": "Развёрнуто",
+    "en": "Expanded"
+  },
+  {
+    "ru": "Свёрнуто",
+    "en": "Collapsed"
+  },
+  {
+    "ru": "Доступно",
+    "en": "Available"
+  },
+  {
+    "ru": "Версии",
+    "en": "Versions"
+  },
+  {
+    "ru": "История копий",
+    "en": "Backup history"
+  },
+  {
+    "ru": "Перед копированием",
+    "en": "Before copying"
+  },
+  {
+    "ru": "История изменений",
+    "en": "Release history"
+  },
+  {
+    "ru": "Отдельные копии важных этапов монтажа. Комментарий необязателен. Ручные версии не удаляются автоматически.",
+    "en": "Keep separate copies of important edits. Comments are optional. Manual versions are never deleted automatically."
+  },
+  {
+    "ru": "Авто сохраняет изменения, пока работает Premiere Pro. Всегда — пока открыта утилита. Выкл. оставляет только ручное копирование.",
+    "en": "Auto protects your projects while Premiere Pro is running. Always works while this utility is running. Off allows manual copies only."
+  },
+  {
+    "ru": "%@ недавних состояний, %@ часовых и %@ дневных копий. Неизменённые проекты не дублируются.",
+    "en": "%@ recent states, %@ hourly and %@ daily checkpoints. Unchanged projects are not duplicated."
+  },
+  {
+    "ru": "Сохрани изменения в Premiere Pro: утилита копирует файл проекта с диска. Оригиналы остаются на месте.",
+    "en": "Save your changes in Premiere Pro first: the utility copies the project file on disk. Originals stay in place."
+  },
+  {
+    "ru": "Настройки…",
+    "en": "Settings…"
+  },
+  {
+    "ru": "Скрыть окно",
+    "en": "Hide window"
+  },
+  {
+    "ru": "Резервирование",
+    "en": "Backups"
   }
 ]

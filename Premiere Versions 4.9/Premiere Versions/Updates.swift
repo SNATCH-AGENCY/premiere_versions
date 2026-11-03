@@ -97,7 +97,8 @@ nonisolated final class PVAppcastReader: NSObject, XMLParserDelegate {
     }
     private var task: Task<Void, Never>?
     #if canImport(Sparkle)
-    private lazy var sparkle = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
+    private let relaunchDelegate = PVUpdateRelaunchDelegate()
+    private lazy var sparkle = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: relaunchDelegate, userDriverDelegate: nil)
     #endif
     var canInstall: Bool {
         #if canImport(Sparkle)
@@ -171,15 +172,14 @@ nonisolated final class PVAppcastReader: NSObject, XMLParserDelegate {
 
 struct PVUpdateSettings: View {
     @ObservedObject var service: PVUpdateService
+    var showRelease = true
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(PVL("Обновления")).font(.system(size: 13, weight: .medium))
-            VStack(alignment: .leading, spacing: 4) {
+            if showRelease { VStack(alignment: .leading, spacing: 4) {
                 Text(AppRelease.label).font(.system(size: 12, design: .monospaced))
                 Text(PVL("Дата сборки: ") + PVBuildDate.label)
                     .font(.system(size: 11)).foregroundStyle(.secondary)
-            }
-            Divider()
+            } }
             Button(PVL("Проверить обновления"), action: service.check)
                 .buttonStyle(PVQuietButtonStyle()).disabled(service.checking)
             HStack(spacing: 6) {
@@ -210,3 +210,9 @@ nonisolated enum PVBuildDate {
         return formatter.string(from: date)
     }
 }
+
+#if canImport(Sparkle)
+@MainActor private final class PVUpdateRelaunchDelegate: NSObject, SPUUpdaterDelegate {
+    func updaterWillRelaunchApplication(_ updater: SPUUpdater) { PVTerminationContext.updating = true }
+}
+#endif

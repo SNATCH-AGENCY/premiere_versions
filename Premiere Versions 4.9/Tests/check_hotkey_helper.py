@@ -38,6 +38,15 @@ import Carbon
      try await service.unregister()
      write("result.json",["passed":restored,"relaunchedByHelper":true,"customShortcutRestored":restored]);NSApp.terminate(nil);return
     }
+    if CommandLine.arguments.contains("--enable-disabled-fixture") {
+     let shortcut=PVHelperShortcut(keyCode:UInt32(kVK_F19),modifiers:UInt32(cmdKey|controlKey|optionKey|shiftKey),keyLabel:"F19")
+     guard await configure(try JSONEncoder().encode(shortcut)) else {throw NSError(domain:"HelperTest",code:30)}
+     for _ in 0..<100 {
+      if helperState()["backgroundEnabled"] as? Bool == true {break}
+      try await Task.sleep(nanoseconds:100_000_000)
+     }
+     write("phase1.json",["configured":true,"disabledPolicyVerified":true]);NSApp.terminate(nil);return
+    }
     try service.register()
     guard service.status == .enabled else {throw NSError(domain:"HelperTest",code:1,userInfo:[NSLocalizedDescriptionKey:"Login item requires manual macOS approval; fixture was unregistered."])}
     let rejected=await configure(Data("{}".utf8))
@@ -50,7 +59,15 @@ import Carbon
      try await Task.sleep(nanoseconds:100_000_000)
     }
     guard synchronized else {throw NSError(domain:"HelperTest",code:4)}
-    write("phase1.json",["configured":true,"invalidPayloadRejected":true]);NSApp.terminate(nil)
+    var disabled=shortcut;disabled.backgroundEnabled=false;disabled.launchWithPremiere=true
+    guard await configure(try JSONEncoder().encode(disabled)) else {throw NSError(domain:"HelperTest",code:31)}
+    var disabledObserved=false
+    for _ in 0..<100 {
+     if helperState()["backgroundEnabled"] as? Bool == false,helperState()["auto"] as? Bool == false {disabledObserved=true;break}
+     try await Task.sleep(nanoseconds:100_000_000)
+    }
+    guard disabledObserved else {throw NSError(domain:"HelperTest",code:32)}
+    write("disabled-ready.json",["disabled":true]);NSApp.terminate(nil)
    } catch {
     try? await service.unregister()
     write("result.json",["passed":false,"error":error.localizedDescription,"domain":(error as NSError).domain,"code":(error as NSError).code,"details":String(describing:(error as NSError).userInfo)]);NSApp.terminate(nil)
@@ -78,9 +95,26 @@ with tempfile.TemporaryDirectory(prefix='pv-icon-service-helper-',dir='/private/
   try:
    process=subprocess.Popen(['/usr/bin/open','-n','-g','-W',str(fixture)],stdout=log,stderr=log)
    deadline=time.monotonic()+40
-   while time.monotonic()<deadline and not (temp/'phase1.json').exists() and not (temp/'result.json').exists():time.sleep(.1)
+   while time.monotonic()<deadline and not (temp/'disabled-ready.json').exists() and not (temp/'result.json').exists():time.sleep(.1)
    if (temp/'result.json').exists():raise RuntimeError(json.loads((temp/'result.json').read_text()))
-   if not (temp/'phase1.json').exists():raise RuntimeError('First phase timed out')
+   if not (temp/'disabled-ready.json').exists():raise RuntimeError('Disabled phase timed out')
+   process.wait(timeout=10);process=None
+   deadline=time.monotonic()+15
+   while time.monotonic()<deadline:
+    try:state=json.loads((temp/'helper-state.json').read_text())
+    except (OSError,ValueError):time.sleep(.1);continue
+    if not state.get('mainRunning') and not state.get('registered') and not state.get('auto') and not state.get('backgroundEnabled'):break
+    time.sleep(.1)
+   else:raise RuntimeError('Disabled helper still listens or auto-launches')
+   (temp/'trigger').write_text('disabled shortcut must not launch the owner')
+   time.sleep(1)
+   state=json.loads((temp/'helper-state.json').read_text())
+   if state.get('mainRunning') or (temp/'phase1.json').exists() or (temp/'result.json').exists():raise RuntimeError('Disabled helper relaunched its owner')
+   print('PASS: disabled background activity suppresses both hotkey and auto-launch after owner exit')
+   process=subprocess.Popen(['/usr/bin/open','-n','-g','-W',str(fixture),'--args','--enable-disabled-fixture'],stdout=log,stderr=log)
+   deadline=time.monotonic()+40
+   while time.monotonic()<deadline and not (temp/'phase1.json').exists() and not (temp/'result.json').exists():time.sleep(.1)
+   if not (temp/'phase1.json').exists():raise RuntimeError('Re-enabling phase failed')
    process.wait(timeout=10);process=None
    registered=False;deadline=time.monotonic()+20
    while time.monotonic()<deadline:

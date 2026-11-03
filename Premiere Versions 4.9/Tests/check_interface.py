@@ -14,8 +14,8 @@ for p in (root/'Premiere Versions').glob('*.swift'):
         s=s.replace('struct ContentView: View {', 'struct ContentView: View {\n    @State private var pvTestPointerInside = true')
         a=s.index('    private func pointerIsInsidePanel(');b=s.index('    private func schedulePanelClose(',a)
         s=s[:a]+'    private func pointerIsInsidePanel(_ panel: Panel) -> Bool { pvTestPointerInside }\n\n'+s[b:]
-        s=s.replace('        .onChange(of: logoVariant) {', '        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestHoverSettings"))) { _ in schedulePanel(.settings, hovering: true) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestClickSettings"))) { _ in openPanelImmediately(.settings) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestSpuriousExit"))) { _ in schedulePanelClose(.settings) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestPointerOutside"))) { _ in pvTestPointerInside = false; schedulePanelClose(.settings) }\n        .onChange(of: logoVariant) {')
-        s=s.replace('        .onChange(of: logoVariant) {', '        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestDismissPanel"))) { _ in dismissPanel() }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestInspectPanel"))) { _ in\n            NotificationCenter.default.post(name: Notification.Name("PVTestPanelState"), object: nil, userInfo: ["visible": activePanel != nil, "centered": panelCentered])\n        }\n        .onChange(of: logoVariant) {')
+        s=s.replace('        .onChange(of: logoVariant) {', '        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestHoverSettings"))) { _ in schedulePanel(.settings, hovering: true) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestClickSettings"))) { _ in schedulePanel(.settings, hovering: false) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestSpuriousExit"))) { _ in schedulePanelClose(.settings) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestPointerOutside"))) { _ in pvTestPointerInside = false; schedulePanelClose(.settings) }\n        .onChange(of: logoVariant) {')
+        s=s.replace('        .onChange(of: logoVariant) {', '        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestRouteBackups"))) { _ in openLinkedPanel(.backups) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestRouteSettings"))) { _ in openLinkedPanel(.settings) }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestDismissPanel"))) { _ in dismissPanel() }\n        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestInspectPanel"))) { _ in\n            NotificationCenter.default.post(name: Notification.Name("PVTestPanelState"), object: nil, userInfo: ["progress": panelProgress, "closing": panelClosing, "visible": activePanel != nil, "centered": panelCentered, "panel": activePanel?.rawValue ?? "none", "x": activePanel.map { Double(panelPosition(for: $0, in: utilitySize).x) } ?? 0, "y": activePanel.map { Double(panelPosition(for: $0, in: utilitySize).y) } ?? 0])\n        }\n        .onChange(of: logoVariant) {')
         s=s.replace('struct ContentView: View {','''struct ContentView: View {
     init(previewPanel: String = "version") {
         _sourceProjectURL = State(initialValue: URL(fileURLWithPath: "/private/tmp/project.prproj"))
@@ -25,15 +25,17 @@ for p in (root/'Premiere Versions').glob('*.swift'):
         _didRestore = State(initialValue: true)
         _showingWelcome = State(initialValue: previewPanel.hasPrefix("welcome"))
         _visibleWindow = State(initialValue: previewPanel != "welcome-hidden")
-        _panelPinned = State(initialValue: true)
+        _panelMenuTracking = State(initialValue: true)
         _panelCentered = State(initialValue: previewPanel == "settings-centered" || previewPanel == "logoEditor")
-        _updateScrollRequest = State(initialValue: previewPanel == "settings-centered" ? 1 : 0)
-        _panelAnchor = State(initialValue: CGPoint(x: previewPanel == "backups" ? 120 : 675, y: ["backups", "shortcut"].contains(previewPanel) ? 509 : 55))
+        _foldersExpanded = State(initialValue: previewPanel == "settings-folders")
+        _appearanceExpanded = State(initialValue: previewPanel == "settings-appearance")
+        _backupDetailsExpanded = State(initialValue: previewPanel == "backups-details")
+        _panelAnchor = State(initialValue: CGPoint(x: previewPanel.hasPrefix("backups") ? 120 : 675, y: (previewPanel.hasPrefix("backups") || previewPanel == "shortcut") ? 509 : 55))
         _commentStage = State(initialValue: previewPanel == "comment")
         _selectingProject = State(initialValue: ["project", "project-ready", "project-missing"].contains(previewPanel))
         if ["project", "project-missing"].contains(previewPanel) { _sourceProjectURL = State(initialValue: nil) }
         _missingProjectName = State(initialValue: previewPanel == "project-missing" ? "Монтаж" : "")
-        let selected: Panel? = previewPanel == "backups" ? .backups : ["settings", "settings-centered"].contains(previewPanel) ? .settings : previewPanel == "shortcut" ? .shortcut : previewPanel == "help" ? .help : previewPanel == "logoEditor" ? .logoEditor : nil
+        let selected: Panel? = previewPanel.hasPrefix("backups") ? .backups : previewPanel.hasPrefix("settings") ? .settings : previewPanel == "shortcut" ? .shortcut : previewPanel == "help" ? .help : previewPanel == "logoEditor" ? .logoEditor : nil
         _activePanel = State(initialValue: selected)
     }
 ''')
@@ -49,6 +51,18 @@ for p in (root/'Premiere Versions').glob('*.swift'):
         .onExitCommand { dismissPanel() }''')
         a=s.index('    private var previousVersionLabel: String {');b=s.index('    private func suggestedVersionNumber()',a)
         s=s[:a]+'    private var previousVersionLabel: String { "v013" }\n\n'+s[b:]
+    if p.name=='InteractionControls.swift':
+        a=s.index('struct PVHoverSection')
+        section=s[a:]
+        section=section.replace('.onHover { inside in\n            hovered = inside\n            schedule(inside)\n        }', '.onHover { _ in }')
+        section=section.replace('        .onDisappear { pending?.cancel() }', '''        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestSectionHover"))) { note in
+            if symbol == "paintbrush", let inside = note.object as? Bool { hovered = inside; schedule(inside) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("PVTestSectionInspect"))) { _ in
+            if symbol == "paintbrush" { NotificationCenter.default.post(name: Notification.Name("PVTestSectionState"), object: expanded) }
+        }
+        .onDisappear { pending?.cancel() }''')
+        s=s[:a]+section
     if p.name=='UtilityInteraction.swift':
         s=s.replace('view.changed = { value in if visible != value { visible = value } }', 'view.changed = { _ in }')
     if p.name=='UserLogoLibrary.swift':

@@ -219,3 +219,114 @@ final class PVLayoutScrollView: NSScrollView {
     var onLayout: (() -> Void)?
     override func layout() { super.layout(); onLayout?() }
 }
+
+/// Independent state-driven switches avoid AppKit tint reuse across hosted controls.
+struct PVSwitchStyle: ToggleStyle {
+    @Environment(\.isEnabled) private var enabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 10) {
+            configuration.label
+            Spacer(minLength: 8)
+            Button { configuration.isOn.toggle() } label: {
+                Capsule().fill(configuration.isOn ? Color(red: 0.70, green: 0.48, blue: 0.84) : Color.white.opacity(0.13))
+                    .overlay(alignment: configuration.isOn ? .trailing : .leading) {
+                        Circle().fill(Color(red: 0.92, green: 0.87, blue: 0.97))
+                            .padding(2)
+                    }
+                    .frame(width: 32, height: 18)
+                    .frame(minWidth: 40, minHeight: 28)
+                    .contentShape(Rectangle())
+            }.buttonStyle(.plain)
+                .opacity(enabled ? 1 : 0.4)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.16), value: configuration.isOn)
+                .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }
+        }
+    }
+}
+
+/// Trigger geometry is captured in the utility's coordinate space, never a transient key window.
+struct PVPanelTrigger: ViewModifier {
+    let id: String
+    func body(content: Content) -> some View {
+        content.background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: PVPanelTriggerFrames.self,
+                    value: [id: proxy.frame(in: .named("PVUtilityContent"))])
+            }
+        }
+    }
+}
+struct PVPanelTriggerFrames: PreferenceKey {
+    static var defaultValue: [String: CGRect] { [:] }
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, latest in latest })
+    }
+}
+nonisolated enum PVPanelTiming {
+    static let open: UInt64 = 150_000_000
+    static let close: UInt64 = 350_000_000
+}
+nonisolated enum PVPanelPlacement {
+    static func center(anchor: CGPoint, dimensions: CGSize, available: CGSize) -> CGPoint {
+        let half = CGSize(width: dimensions.width / 2, height: dimensions.height / 2)
+        func clamp(_ value: CGFloat, _ half: CGFloat, _ size: CGFloat) -> CGFloat {
+            guard value.isFinite, half.isFinite, size.isFinite else { return size / 2 }
+            return min(max(value, half + 16), max(half + 16, size - half - 16))
+        }
+        return CGPoint(x: clamp(anchor.x, half.width, available.width),
+                       y: clamp(anchor.y, half.height, available.height))
+    }
+}
+
+/// Hover owns expansion; pointer re-entry cancels a pending close. No click pinning.
+struct PVHoverSection<Content: View>: View {
+    let title: String
+    let symbol: String
+    @Binding var expanded: Bool
+    @ViewBuilder let content: () -> Content
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hovered = false
+    @State private var pending: Task<Void, Never>?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 9) {
+                if !symbol.isEmpty { Image(systemName: symbol).frame(width: 17) }
+                Text(title).font(.system(size: 12, weight: .medium))
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 9, weight: .light))
+                    .rotationEffect(.degrees(expanded ? 90 : 0))
+            }.frame(minHeight: 40).contentShape(Rectangle())
+                .accessibilityElement(children: .combine)
+                .accessibilityValue(PVL(expanded ? "Развёрнуто" : "Свёрнуто"))
+                .accessibilityAction { change(!expanded) }
+            if expanded {
+                content().padding(.top, 7).padding(.bottom, 10)
+                    .transition(.opacity)
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { inside in
+            hovered = inside
+            schedule(inside)
+        }
+        .onDisappear { pending?.cancel() }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: expanded)
+    }
+    private func change(_ value: Bool) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.28)) { expanded = value }
+    }
+    private func schedule(_ opening: Bool) {
+        pending?.cancel()
+        guard opening != expanded else { return }
+        pending = Task { @MainActor in
+            do { try await Task.sleep(nanoseconds: opening ? PVPanelTiming.open : PVPanelTiming.close) } catch { return }
+            guard !Task.isCancelled, hovered == opening else { return }
+            if opening && PVPanelInteraction.isScrolling() { schedule(true); return }
+            if !opening && PVPanelInteraction.isBusy(window: NSApp.windows.first(where: { $0 is PVUtilityWindow && $0.isVisible })) {
+                schedule(false)
+            } else { change(opening) }
+        }
+    }
+}
+

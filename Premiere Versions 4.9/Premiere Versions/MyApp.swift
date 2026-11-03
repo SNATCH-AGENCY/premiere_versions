@@ -22,12 +22,18 @@ struct PremiereVersionsApp: App {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let autosaveMonitor = AutosaveMonitor()
     private let hotKey = GlobalSaveHotKey()
     private var saveWindow: NSWindow?
     private var explicitlyReopened = false
     private let menuBar = PVMenuBarController()
+    private var forceQuitRequested = false
+    private var terminating = false
+    private var terminationPrepared = false
+    private var systemShutdown = false
+    private var shutdownObserver: NSObjectProtocol?
+    private var backgroundEnabled: Bool { UserDefaults.standard.object(forKey: "hotKeyHelperEnabled") as? Bool ?? true }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         hotKey.onPress = { [weak self] in self?.showSaveWindow() }
@@ -35,7 +41,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PVHotKeyHelperManager.shared.start()
         PVUpdateService.shared.startAutomaticChecks()
         menuBar.onOpen = { [weak self] in self?.showSaveWindow() }
+        menuBar.onQuitFully = { [weak self] in self?.forceQuitRequested = true; NSApp.terminate(nil) }
+        menuBar.onNavigate = { [weak self] panel in
+            self?.showSaveWindow()
+            PVPanelNavigation.shared.request = panel
+        }
+        menuBar.onCheckUpdates = { [weak self] in
+            self?.showSaveWindow()
+            PVPanelNavigation.shared.request = "help"
+            PVUpdateService.shared.check()
+        }
+        menuBar.onBackupModeChanged = { [weak self] in self?.autosaveMonitor.reconcile() }
+        menuBar.updateAvailable = { PVUpdateService.shared.available != nil }
+        menuBar.onHide = { [weak self] in
+            guard let self else { return }
+            if backgroundEnabled { menuBar.enterBackground() }
+            saveWindow?.orderOut(nil)
+        }
         menuBar.start()
+        shutdownObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willPowerOffNotification,
+            object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.systemShutdown = true } }
         PVBrand.applySelectedIcon()
         // An explicit launch must always reveal the utility, including its unfinished welcome.
         NSApp.setActivationPolicy((UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? false) ? .regular : .accessory)
@@ -48,19 +73,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { false }
 
     func showSaveWindow() {
+        menuBar.leaveBackground()
         if saveWindow == nil {
             let content = ContentView()
                 .environmentObject(autosaveMonitor)
                 .environmentObject(hotKey)
             let controller = NSHostingController(rootView: content.preferredColorScheme(.dark))
             let window = PVUtilityWindow(contentViewController: controller)
+            window.delegate = self
             window.title = PVL("Premiere Versions — Сохранить версию")
             window.titlebarAppearsTransparent = true
             window.appearance = NSAppearance(named: .darkAqua)
             window.isOpaque = false
             window.backgroundColor = .clear
             window.titleVisibility = .hidden
-            window.isMovableByWindowBackground = true
+            window.isMovableByWindowBackground = false
             window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
             window.collectionBehavior = [.fullScreenNone]
             window.standardWindowButton(.zoomButton)?.isEnabled = false
@@ -100,9 +127,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    func windowWillClose(_ notification: Notification) {
+        guard notification.object as? NSWindow === saveWindow, !terminating else { return }
+        if backgroundEnabled { menuBar.enterBackground() }
+        else { NSApp.terminate(nil) }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let reason = NSAppleEventManager.shared().currentAppleEvent?.paramDescriptor(forKeyword: AEKeyword(kAEQuitReason))?.enumCodeValue
+        let systemReason = reason.map { [OSType(kAEQuitAll), OSType(kAEShutDown), OSType(kAERestart), OSType(kAEReallyLogOut)].contains($0) } ?? false
+        if systemShutdown || systemReason || PVTerminationContext.updating || terminationPrepared { return .terminateNow }
+        if backgroundEnabled && !forceQuitRequested {
+            menuBar.enterBackground()
+            saveWindow?.orderOut(nil)
+            return .terminateCancel
+        }
+        guard !terminating else { return .terminateCancel }
+        terminating = true
+        Task { @MainActor in
+            let canQuit = await PVHotKeyHelperManager.shared.suspendForTermination()
+            if canQuit {
+                autosaveMonitor.stop(); hotKey.stop()
+                terminationPrepared = true
+                sender.terminate(nil)
+            } else { terminating = false; forceQuitRequested = false; showSaveWindow() }
+        }
+        // Keep the normal run loop alive while the helper unregisters; AppKit's
+        // terminate-later modal loop can prevent main-actor XPC tasks from running.
+        return .terminateCancel
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         hotKey.stop()
         menuBar.stop()
+        if let shutdownObserver { NSWorkspace.shared.notificationCenter.removeObserver(shutdownObserver) }
     }
 }
 
