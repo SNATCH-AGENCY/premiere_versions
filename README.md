@@ -15,10 +15,10 @@ Its purpose is simple: **help protect important edits with deliberate version sa
 
 ## Get started
 
-1. Download the **DMG installer** from [Releases](https://github.com/pewakkk/premiere_versions/releases/latest), open it and **drag Premiere Versions.app onto Applications**. Open the app from Applications, then eject the installer.
+1. Download the **DMG installer** from [Releases](https://github.com/SNATCH-AGENCY/premiere_versions/releases/latest), open it and **drag Premiere Versions.app onto Applications**. Open the app from Applications, then eject the installer.
 2. Choose your Premiere project and allow access to the folders you want to use. Choose Auto in the Backups panel.
-3. Save your latest changes in Premiere Pro with **Command+S**.
-4. With Premiere Pro active, press **Option+S**, choose a version number, then press Return. Add an optional comment and press Return again to keep the copy.
+3. The invisible save plugin installs automatically. If Premiere Pro was already open during its first installation, restart Premiere once. No Creative Cloud installation or plugin panel is required.
+4. With Premiere Pro active, press **Option+S**, choose the same project that is active in Premiere, choose a version number, then press Return. Add an optional comment and press Return again. Premiere saves the project before the archive copy is created.
 
 The shortcut can be changed in Settings. You can also open the utility from its menu bar icon or the Dock.
 
@@ -30,7 +30,9 @@ New automatic discovery uses the **file creation date within the last 48 hours**
 
 ## What is protected?
 
-Premiere Versions copies the **project file already saved on disk**. It cannot capture edits you have not saved in Premiere. Copies do not include your footage, audio or other linked media.
+For a **numbered version**, the save plugin asks Premiere Pro to save the selected active project first. The archive copy is created only after a matching-project confirmation; a failed save or lost connection does not silently create an older copy.
+
+**Automatic backups** still use stable project files saved on disk. They do not force saves in Premiere. Copies do not include your footage, audio or other linked media.
 
 Keep your media backed up too. For protection against a drive failure, choose a backup location on a different drive.
 
@@ -70,12 +72,10 @@ Essential settings stay visible. Hover over folder locations or appearance to un
 
 ## Latest improvements
 
-- **Simpler settings.** Essential controls stay visible; folder locations, appearance and backup details unfold on hover. Panels share consistent timing, larger targets and a quick route back to Settings.
-- **Background activity you control.** Quitting from Dock or with Command+Q keeps protection in the menu bar when enabled. Quit completely from the menu bar, or disable background activity to stop all background functions after quitting.
-- **Useful menu bar controls.** Open Settings and Backups, change backup mode, check for updates or quit completely.
-- **Updates beside the version.** Update status and the notification dot now live with version information. Help focuses on protecting and finding your work.
-- **One-click language switching.** A compact En/Ru button remembers your choice. English and Russian interface coverage has been checked.
-- General improvements to panel placement, control dragging, switch appearance and interface transitions.
+- Fixed version saves: Premiere Pro saves the selected active project before its archive copy is created. A separate Command+S is no longer needed.
+- The signed, invisible save plugin installs and updates with the app, without Creative Cloud. Restart Premiere after its first installation if Premiere is already running.
+- Added safeguards for mismatched projects, failed or interrupted saves and cancellation. Archive copying is verified and runs away from the interface thread.
+- General reliability and localization improvements.
 
 ## Your work stays yours
 
@@ -83,4 +83,4 @@ Projects and backups stay in the folders you choose. Project files, comments and
 
 ---
 
-Want to build or contribute? See [development notes](DEVELOPMENT.md). For most people, the ready-to-use app in [Releases](https://github.com/pewakkk/premiere_versions/releases/latest) is all you need.
+Want to build or contribute? See [development notes](DEVELOPMENT.md). For most people, the ready-to-use app in [Releases](https://github.com/SNATCH-AGENCY/premiere_versions/releases/latest) is all you need.

@@ -36,6 +36,19 @@ final class IconService: NSObject, PVIconServiceProtocol {
               let expected = Bundle(url: owner)?.executableURL else { return false }
         return executable.resolvingSymlinksInPath() == expected.resolvingSymlinksInPath()
     }
+    func installPremiereBridge(_ configuration: Data, reply: @escaping (Bool, String) -> Void) {
+        guard Self.trustedOwner(Self.owner) else { reply(false, "Install Premiere Versions in Applications before preparing its plugin."); return }
+        do {
+            #if PV_ICON_TESTING
+            let home = Self.owner.deletingLastPathComponent().appendingPathComponent("bridge-home", isDirectory: true)
+            try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+            reply(true, try PVBridgeInstaller.install(owner: Self.owner, configuration: configuration, home: home))
+            #else
+            reply(true, try PVBridgeInstaller.install(owner: Self.owner, configuration: configuration))
+            #endif
+        }
+        catch { reply(false, error.localizedDescription) }
+    }
     func consumeBackgroundLaunch(reply: @escaping (Bool) -> Void) {
         guard Self.trustedOwner(Self.owner), let ownerID = Bundle(url: Self.owner)?.bundleIdentifier else { reply(false); return }
         let domain = (ownerID + ".HotKeyHelper") as CFString

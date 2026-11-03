@@ -1,8 +1,8 @@
 # Release setup
 
-Repository: https://github.com/pewakkk/premiere_versions
+Repository: https://github.com/SNATCH-AGENCY/premiere_versions
 
-Feed URL: https://raw.githubusercontent.com/pewakkk/premiere_versions/main/docs/appcast.xml
+Feed URL: https://raw.githubusercontent.com/SNATCH-AGENCY/premiere_versions/main/docs/appcast.xml
 
 The public release feed is hosted in this repository. Publish the verified release asset before updating the feed. GitHub Pages is not required.
 

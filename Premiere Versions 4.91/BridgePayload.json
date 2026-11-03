@@ -1,0 +1,13 @@
+{
+  "identifier": "dev.premiereversions.bridge",
+  "version": "4.91.1",
+  "files": {
+    "index.html": "ad6cc5333fb201b61a054bdf25688bc19f72a77ef72a82e999d2aedf7b0d26ec",
+    "core.js": "1c1b88fcd8034c98145ca9b2f19773b094df2a5e2de98f841af31597ba22e7d5",
+    "bridge.js": "d9ff33f7b6e6634c2a6d768df66e28d76076485f48790abb5afda60ff5bec189",
+    "mimetype": "6f4ece9eef5c4e518ad56a6f82d14e95f93e4e5d07b1cb8d22de8666d7ac3d7f",
+    "host.jsx": "3eb779c8c116858fcb7951064c16bf477b2024135a89ded460faa0a5972c448a",
+    "META-INF/signatures.xml": "f756cfb03d91a90a2f07266975439e269e687d3cea395b4d1e40a5e4a825e39d",
+    "CSXS/manifest.xml": "bb88055322b563c246b8257a2a3034f71b91029cda98cc427860b56bdc30c7d5"
+  }
+}

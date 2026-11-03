@@ -64,6 +64,8 @@ for p in (root/'Premiere Versions').glob('*.swift'):
         .onDisappear { pending?.cancel() }''')
         s=s[:a]+section
     if p.name=='UtilityInteraction.swift':
+        # Offscreen render fixtures must not inherit mouse buttons pressed in another application.
+        s=s.replace('NSEvent.pressedMouseButtons != 0', 'false')
         s=s.replace('view.changed = { value in if visible != value { visible = value } }', 'view.changed = { _ in }')
     if p.name=='UserLogoLibrary.swift':
         a=s.index('    private func migrateLegacyHistory() {');b=s.index('    func importLegacyFolder()',a)

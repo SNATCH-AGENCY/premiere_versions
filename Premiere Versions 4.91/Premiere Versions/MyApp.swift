@@ -38,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         hotKey.onPress = { [weak self] in self?.showSaveWindow() }
         hotKey.start()
+        PremiereBridge.shared.start()
         PVHotKeyHelperManager.shared.start()
         PVUpdateService.shared.startAutomaticChecks()
         menuBar.onOpen = { [weak self] in self?.showSaveWindow() }

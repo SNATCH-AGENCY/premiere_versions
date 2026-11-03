@@ -58,7 +58,7 @@ nonisolated final class PVAppcastReader: NSObject, XMLParserDelegate {
         guard let full = values["sparkle:version"]?.trimmingCharacters(in: .whitespacesAndNewlines),
               let version = values["sparkle:shortVersionString"]?.trimmingCharacters(in: .whitespacesAndNewlines),
               let rawURL = values["url"], let url = URL(string: rawURL), url.scheme == "https",
-              url.host == "github.com", url.path.hasPrefix("/pewakkk/premiere_versions/releases/download/"),
+              PVReleaseSource.permits(url),
               full.range(of: #"^\d+(?:\.\d+)*$"#, options: .regularExpression) != nil,
               version.range(of: #"^\d+(?:\.\d+)*$"#, options: .regularExpression) != nil else { return }
         // Feed versions are full version.build so minor releases may reset their displayed build.
@@ -69,13 +69,27 @@ nonisolated final class PVAppcastReader: NSObject, XMLParserDelegate {
     }
 }
 
+nonisolated enum PVReleaseSource {
+    static let repository = URL(string: "https://github.com/SNATCH-AGENCY/premiere_versions")!
+    // Preserve trusted redirects used by releases installed before the repository transfer.
+    static let legacyRepository = URL(string: "https://github.com/pewakkk/premiere_versions")!
+    static let feed = URL(string: "https://raw.githubusercontent.com/SNATCH-AGENCY/premiere_versions/main/docs/appcast.xml")!
+    static func permits(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https", url.host?.lowercased() == "github.com",
+              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
+              url.port == nil || url.port == 443,
+              !url.path.components(separatedBy: "/").contains(where: { $0 == "." || $0 == ".." }) else { return false }
+        return [repository, legacyRepository].contains { url.path.lowercased().hasPrefix($0.path.lowercased() + "/releases/download/") }
+    }
+}
+
 @MainActor final class PVUpdateService: ObservableObject {
     static let shared = PVUpdateService()
     private var automaticTimer: Timer?
     private var lastAttempt: Date?
     private var wakeObserver: NSObjectProtocol?
-    nonisolated static let feed = URL(string: "https://raw.githubusercontent.com/pewakkk/premiere_versions/main/docs/appcast.xml")!
-    nonisolated static let releases = URL(string: "https://github.com/pewakkk/premiere_versions/releases")!
+    nonisolated static let feed = PVReleaseSource.feed
+    nonisolated static let releases = PVReleaseSource.repository.appendingPathComponent("releases")
     @Published private(set) var checking = false
     @Published private(set) var available: PVUpdateRelease?
     @Published private(set) var status = PVL("Обновления ещё не проверялись")

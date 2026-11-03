@@ -16,8 +16,9 @@ if archive.exists():
     print('Existing archive matches the app; resuming signing.')
 else:
     subprocess.run([sys.executable,str(root/'tools/release_zip.py'),str(app),str(archive)],check=True)
+# Compatibility download alias redirects to the organization; older apps only trust this path.
 account='devplaceholder.YDHGHCQE.Premiere-Versions'
-subprocess.run([str(root/'Vendor/bin/generate_appcast'),'--account',account,'--download-url-prefix',f'https://github.com/pewakkk/premiere_versions/releases/download/v{version}-build{build}/','--link','https://github.com/pewakkk/premiere_versions','--versions',info['CFBundleVersion'],str(output)],check=True)
+subprocess.run([str(root/'Vendor/bin/generate_appcast'),'--account',account,'--download-url-prefix',f'https://github.com/pewakkk/premiere_versions/releases/download/v{version}-build{build}/','--link','https://github.com/SNATCH-AGENCY/premiere_versions','--versions',info['CFBundleVersion'],str(output)],check=True)
 if not (output/'appcast.xml').exists():raise SystemExit('Official generator did not produce appcast.xml.')
 (output/'checksums.json').write_text(json.dumps({'version':version,'build':build,'machineVersion':info['CFBundleVersion'],'archive':archive.name,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest()},indent=2)+'\n')
 print('Signed artifacts prepared. Nothing was uploaded. A successful real update test is still required.')

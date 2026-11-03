@@ -1,3 +1,10 @@
+# 4.91 Build 1
+
+- Fixed version saves: Premiere Pro saves the selected active project before its archive copy is created. A separate Command+S is no longer needed.
+- The signed, invisible save plugin installs and updates with the app, without Creative Cloud. Restart Premiere after its first installation if Premiere is already running.
+- Added safeguards for mismatched projects, failed or interrupted saves and cancellation. Archive copying is verified and runs away from the interface thread.
+- General reliability and localization improvements.
+
 # 4.9 Build 1
 
 - **Simpler settings.** Essential controls stay visible; folder locations, appearance and backup details unfold on hover. Panels share consistent timing, larger targets and a quick route back to Settings.

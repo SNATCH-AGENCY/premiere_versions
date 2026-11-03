@@ -1,9 +1,13 @@
 """Build the narrow embedded XPC service before signing its enclosing app."""
 from pathlib import Path
-import argparse, os, plistlib, subprocess, tempfile
+import argparse, os, plistlib, subprocess, tempfile, shutil
 
 def build(root, app, identifier, *, testing=False):
     root,app=Path(root),Path(app)
+    payload = app/'Contents/Resources/PremiereBridge'
+    if payload.exists(): shutil.rmtree(payload)
+    shutil.copytree(root/'BridgePlugin', payload)
+    shutil.copy2(root/'BridgePayload.json', app/'Contents/Resources/BridgePayload.json')
     import importlib.util
     spec = importlib.util.spec_from_file_location('pv_helper_builder', root/'tools/build_hotkey_helper.py')
     helper_builder = importlib.util.module_from_spec(spec); spec.loader.exec_module(helper_builder)
@@ -21,7 +25,7 @@ def build(root, app, identifier, *, testing=False):
     if arch not in ['arm64','x86_64']:arch='arm64'
     args+=['-target',arch+'-apple-macos'+os.environ.get('MACOSX_DEPLOYMENT_TARGET','26.6.2')]
     if testing:args+=['-D','PV_ICON_TESTING']
-    args+=[str(root/'Premiere Versions/IconServiceProtocol.swift'),str(root/'Premiere Versions/HelperShortcut.swift'),str(root/'IconService/Service.swift'),'-o',str(binary)]
+    args+=[str(root/'Premiere Versions/IconServiceProtocol.swift'),str(root/'Premiere Versions/HelperShortcut.swift'),str(root/'IconService/BridgeInstaller.swift'),str(root/'IconService/Service.swift'),'-o',str(binary)]
     subprocess.run(args,check=True)
     identity=os.environ.get('EXPANDED_CODE_SIGN_IDENTITY','') or '-'
     subprocess.run(['codesign','--force','--sign',identity,str(service)],check=True)

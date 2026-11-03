@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="7.0" ExtensionBundleId="dev.premiereversions.bridge" ExtensionBundleVersion="4.91.1" ExtensionBundleName="Premiere Versions Save Bridge">
+<ExtensionList><Extension Id="dev.premiereversions.bridge" Version="4.91.1"/></ExtensionList>
+<ExecutionEnvironment><HostList><Host Name="PPRO" Version="[25.0,99.9]"/></HostList><LocaleList><Locale Code="All"/></LocaleList><RequiredRuntimeList><RequiredRuntime Name="CSXS" Version="12.0"/></RequiredRuntimeList></ExecutionEnvironment>
+<DispatchInfoList><Extension Id="dev.premiereversions.bridge"><DispatchInfo>
+<Resources><MainPath>./index.html</MainPath><ScriptPath>./host.jsx</ScriptPath></Resources>
+<Lifecycle><AutoVisible>false</AutoVisible><StartOn><Event>com.adobe.csxs.events.ApplicationActivate</Event><Event>com.adobe.csxs.events.AppOnline</Event></StartOn></Lifecycle>
+<UI><Type>Custom</Type><Geometry><Size><Width>240</Width><Height>100</Height></Size></Geometry></UI>
+</DispatchInfo></Extension></DispatchInfoList></ExtensionManifest>

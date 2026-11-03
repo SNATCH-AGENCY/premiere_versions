@@ -21,7 +21,7 @@ if not icon.exists():errors.append('Embedded icon service missing.')
 elif subprocess.run(['codesign','--verify','--strict',str(icon)],capture_output=True).returncode:errors.append('Icon service signature failed.')
 linked=subprocess.run(['otool','-L',str(app/'Contents/MacOS'/info['CFBundleExecutable'])],capture_output=True,text=True,check=True).stdout
 if 'Sparkle.framework' not in linked:errors.append('The executable was built without Sparkle; rebuild after enabling the dependency.')
-if info.get('SUFeedURL')!='https://raw.githubusercontent.com/pewakkk/premiere_versions/main/docs/appcast.xml':errors.append('Unexpected update-feed URL.')
+if info.get('SUFeedURL')!='https://raw.githubusercontent.com/SNATCH-AGENCY/premiere_versions/main/docs/appcast.xml':errors.append('Unexpected update-feed URL.')
 result=subprocess.run(['codesign','--verify','--deep','--strict',str(app)],capture_output=True,text=True)
 if result.returncode:errors.append('Pristine signature verification failed.')
 if errors:

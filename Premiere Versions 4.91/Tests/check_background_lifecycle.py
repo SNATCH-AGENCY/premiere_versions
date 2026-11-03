@@ -20,6 +20,7 @@ import Carbon
  func start() {}
  func suspendForTermination() async -> Bool { TestState.helperSuspended = true;return true }
 }
+@MainActor final class PremiereBridge { static let shared = PremiereBridge();func start() {} }
 @MainActor final class PVUpdateService { static let shared = PVUpdateService();var available: String? = nil;func check() {};func startAutomaticChecks() {} }
 @MainActor enum PVBrand { static func applySelectedIcon() {} }
 @MainActor enum PVHelperLaunchIntent { static func consume() async -> Bool { false } }

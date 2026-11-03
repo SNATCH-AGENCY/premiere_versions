@@ -5,7 +5,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>PVBuildDate</key>
-	<string>2026-11-03T00:32:19+00:00</string>
+	<string>2026-11-03T10:08:16+00:00</string>
 	<key>PVBuildNumber</key>
 	<string>1</string>
 	<key>SUAutomaticallyUpdate</key>
@@ -17,7 +17,7 @@
 	<key>SUEnableSystemProfiling</key>
 	<false/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/pewakkk/premiere_versions/main/docs/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/SNATCH-AGENCY/premiere_versions/main/docs/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>Wi1bxfkpg9jw1cpQ/lzqPj0imMQUD55RjRdAzHstlFY=</string>
 	<key>SUVerifyUpdateBeforeExtraction</key>

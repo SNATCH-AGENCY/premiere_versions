@@ -67,3 +67,17 @@ Normal quit enters status-only mode without overwriting visibility preferences. 
 Settings scroll memory remains valid for ten seconds after closing; that implementation detail is intentionally absent from in-app help.
 
 Premiere save synchronization is not enabled in this release. Adobe's Project.save API returns a completion result inside a Premiere UXP extension; the standalone utility has no such bridge yet. The installed Premiere AppleScript dictionary does not expose project saving. Keep the explicit save-first workflow rather than sending an unverified keyboard shortcut. Reference: https://developer.adobe.com/premiere-pro/uxp/ppro-reference/classes/project
+
+
+## Saving through Premiere
+
+The immutable signed CEP payload is bundled under Resources/PremiereBridge. The owning XPC service installs only the fixed per-user extension identifier, validates the bundled SHA-256 file index, stages replacements and retains the prior folder until installation succeeds. It refuses foreign folders, symbolic-link destinations and downgrades. Runtime pairing is generated on launch and stored separately with user-only permissions; no developer pairing files or private signing certificate is distributed.
+
+The native loopback listener accepts authenticated, versioned messages and archives only after a matching-project Save confirmation. Cancellation invalidates pending responses. Copying uses stable-source checks and atomic installation off the UI thread. Automatic backups do not invoke the save bridge.
+
+Changing a plugin file requires re-signing the payload and regenerating BridgePayload.json with tools/sign_bridge_plugin.py. Keep the certificate and its password file outside the repository. The current signed payload can be built unchanged without access to the private certificate. Adobe Developer Mode is not enabled by the application.
+
+
+## Repository transfer compatibility
+
+The canonical repository, help links and update feed now use SNATCH-AGENCY/premiere_versions. Existing installations still request the legacy raw feed, which redirects to the transferred repository. Their release parser only accepts the original download path, so the signed appcast retains that trusted redirect alias until support for those installations is explicitly retired. New releases are uploaded only to the organization. The Sparkle signing key and application bundle identifier are unchanged.

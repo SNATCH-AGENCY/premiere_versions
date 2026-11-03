@@ -24,6 +24,9 @@ struct ContentView: View {
     @State private var versionComment = ""
     @State private var statusMessage = PVL("Выбери проект Premiere")
     @State private var isError = false
+    @State private var savingVersion = false
+    @State private var saveGeneration = UUID()
+    @State private var saveTask: Task<Void, Never>?
     @State private var didRestore = false
     private enum Panel: String, Hashable { case settings, backups, shortcut, help, logoEditor }
     @State private var activePanel: Panel?
@@ -193,6 +196,10 @@ struct ContentView: View {
             .overlay(alignment: .top) { PVWindowDragRegion().frame(height: 26).padding(.horizontal, 80) }
             .onPreferenceChange(PVFooterHeight.self) { footerHeight = $0 }
         }
+        .disabled(savingVersion)
+        .overlay(alignment: .bottom) {
+            if savingVersion { Text(PVL("Сохранение в Premiere Pro…")).font(.system(size: 11)).foregroundStyle(theme.muted).padding(.bottom, 9).allowsHitTesting(false) }
+        }
         .ignoresSafeArea()
         .foregroundStyle(theme.ink)
         .tint(theme.accent)
@@ -251,6 +258,7 @@ struct ContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .showVersionSaveWindow)) { _ in
+            guard !savingVersion else { return }
             visualsActive = true
             guard !showingWelcome, !welcomeTransitioning, !showingShortcutEditor && !showingLogoEditor else { return }
             dismissPanel()
@@ -525,6 +533,11 @@ struct ContentView: View {
     }
 
     private func handleEscape() {
+        if savingVersion {
+            saveGeneration = UUID(); saveTask?.cancel(); saveTask = nil; savingVersion = false
+            statusMessage = PVL("Создание копии отменено. Premiere может завершить сохранение проекта."); isError = false
+            return
+        }
         if activePanel != nil { dismissPanel() }
         else if showingWelcome { finishWelcome() }
         else if commentStage { showVersionStage() }
@@ -1458,70 +1471,55 @@ struct ContentView: View {
     // MARK: - Save version
 
     private func createVersion() {
-        guard validateCurrentProject(), let sourceURL = sourceProjectURL else {
-            statusMessage = PVL("Сначала выбери проект .prproj")
-            isError = true
-            return
+        guard !savingVersion else { return }
+        guard validateCurrentProject(), let source = sourceProjectURL else {
+            statusMessage = PVL("Сначала выбери проект .prproj"); isError = true; return
         }
-
         let version = versionNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard version.range(of: #"^v\d{3,}$"#, options: .regularExpression) != nil else {
-            statusMessage = PVL("Номер версии должен быть в формате v008")
-            isError = true
-            return
+            statusMessage = PVL("Номер версии должен быть в формате v008"); isError = true; return
         }
-
-        do {
-            try withScopedAccess(to: sourceURL) {
-                try withArchiveAccess { archiveURL in
-                    let projectFolder = try PVProjectFolders.shared.folder(for: sourceURL, archive: archiveURL, allowLegacyClaim: true)
-                    try fileManager.createDirectory(
-                        at: projectFolder,
-                        withIntermediateDirectories: true
-                    )
-
-                    let formatter = DateFormatter()
-                    formatter.locale = Locale(identifier: "en_US_POSIX")
-                    formatter.timeZone = .current
-                    formatter.dateFormat = "dd-MM-yyyy-HH-mm-ss"
-                    let timestamp = formatter.string(from: Date())
-
-                    let comment = versionComment
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                        .replacingOccurrences(of: "/", with: "-")
-                        .replacingOccurrences(of: ":", with: "-")
-                        .replacingOccurrences(of: "\\", with: "-")
-
-                    var filename = "\(projectName)_\(version)_\(timestamp)"
-                    if !comment.isEmpty {
-                        filename += "_\(comment)"
-                    }
-                    filename += ".prproj"
-
-                    let destination = projectFolder.appendingPathComponent(filename)
-                    guard !fileManager.fileExists(atPath: destination.path) else {
-                        throw NSError(
-                            domain: "PremiereVersions",
-                            code: 12,
-                            userInfo: [NSLocalizedDescriptionKey: PVL("Файл с таким именем уже существует.")]
-                        )
-                    }
-
-                    try fileManager.copyItem(at: sourceURL, to: destination)
-                    statusMessage = PVL("Версия \(version) сохранена")
-                    isError = false
-                    versionComment = ""
-
-                    refreshArchivedVersionNumbers()
-                    versionNumber = suggestedVersionNumber() ?? versionNumber
-                    // Hide the window; keep the shortcut and autosave service running.
-                    NSApp.hide(nil)
+        let name = projectName, comment = versionComment, originalVersion = versionNumber, generation = UUID()
+        saveGeneration = generation; savingVersion = true
+        saveTask = Task { @MainActor in
+            defer { if saveGeneration == generation { savingVersion = false; saveTask = nil } }
+            do {
+                let archive = try resolveBookmark(forKey: "archiveBookmark")
+                let sourceAccess = source.startAccessingSecurityScopedResource()
+                let archiveAccess = archive.startAccessingSecurityScopedResource()
+                defer {
+                    if sourceAccess { source.stopAccessingSecurityScopedResource() }
+                    if archiveAccess { archive.stopAccessingSecurityScopedResource() }
                 }
+                try await PremiereBridge.shared.save(source)
+                try Task.checkCancellation()
+                guard saveGeneration == generation, sourceProjectURL == source, versionNumber == originalVersion, versionComment == comment else {
+                    throw PremiereBridge.Failure(message: "The selection changed; no archive copy was created.")
+                }
+                let folder = try PVProjectFolders.shared.folder(for: source, archive: archive, allowLegacyClaim: true)
+                try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+                let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = .current
+                formatter.dateFormat = "dd-MM-yyyy-HH-mm-ss"
+                let cleanComment = comment.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-").replacingOccurrences(of: "\\", with: "-")
+                var filename = "\(name)_\(version)_\(formatter.string(from: Date()))"
+                if !cleanComment.isEmpty { filename += "_" + cleanComment }
+                let destination = folder.appendingPathComponent(filename + ".prproj")
+                let staged = try await Task.detached(priority: .userInitiated) {
+                    try PVSafeCopy.stage(source, in: folder, now: Date(), stableDelay: 0)
+                }.value
+                defer { try? fileManager.removeItem(at: staged.file) }
+                try Task.checkCancellation()
+                guard saveGeneration == generation, sourceProjectURL == source else { throw CancellationError() }
+                try PVSafeCopy.install(staged.file, at: destination)
+                statusMessage = PVL("Версия \(version) сохранена"); isError = false; versionComment = ""
+                refreshArchivedVersionNumbers(); versionNumber = suggestedVersionNumber() ?? versionNumber
+                NSApp.hide(nil)
+            } catch {
+                guard saveGeneration == generation else { return }
+                if error is CancellationError { statusMessage = PVL("Создание копии отменено. Premiere может завершить сохранение проекта."); isError = false }
+                else { statusMessage = PVL("Ошибка сохранения: \(PVL(error.localizedDescription))"); isError = true }
             }
-
-        } catch {
-            statusMessage = PVL("Ошибка сохранения: \(error.localizedDescription)")
-            isError = true
         }
     }
 }
@@ -1812,7 +1810,7 @@ private struct PVHelpView: View {
             section(PVL("Версии"), PVL("Отдельные копии важных этапов монтажа. Комментарий необязателен. Ручные версии не удаляются автоматически."))
             section(PVL("Резервирование"), PVL("Авто сохраняет изменения, пока работает Premiere Pro. Всегда — пока открыта утилита. Выкл. оставляет только ручное копирование."))
             section(PVL("История копий"), PVL("\(BackupPolicy.recentCount) недавних состояний, \(BackupPolicy.hourlyHours) часовых и \(BackupPolicy.dailyDays) дневных копий. Неизменённые проекты не дублируются."))
-            section(PVL("Перед копированием"), PVL("Сохрани изменения в Premiere Pro: утилита копирует файл проекта с диска. Оригиналы остаются на месте."))
+            section(PVL("Перед копированием"), PVL("Невидимый плагин сохраняет открытый проект в Premiere Pro. Копия создаётся только после подтверждения. Выбранный проект должен совпадать с активным проектом Premiere."))
             Button(PVL("История изменений")) { NSWorkspace.shared.open(PVUpdateService.releases) }.buttonStyle(.plain).font(.system(size: 10))
         }
     }

@@ -1254,5 +1254,117 @@
   {
     "ru": "Резервирование",
     "en": "Backups"
+  },
+  {
+    "ru": "Сохранение в Premiere Pro…",
+    "en": "Saving in Premiere Pro…"
+  },
+  {
+    "ru": "Создание копии отменено. Premiere может завершить сохранение проекта.",
+    "en": "Copy cancelled. Premiere may finish saving the project."
+  },
+  {
+    "ru": "Невидимый плагин сохраняет открытый проект в Premiere Pro. Копия создаётся только после подтверждения. Выбранный проект должен совпадать с активным проектом Premiere.",
+    "en": "The invisible plugin saves the open project in Premiere Pro. A copy is created only after confirmation. Select the same project that is active in Premiere."
+  },
+  {
+    "ru": "Не удалось подготовить плагин Premiere.",
+    "en": "Could not prepare the Premiere plugin."
+  },
+  {
+    "ru": "Подготовка плагина Premiere не завершилась вовремя.",
+    "en": "Premiere plugin preparation timed out."
+  },
+  {
+    "ru": "Локальное соединение с Premiere недоступно",
+    "en": "Local bridge unavailable"
+  },
+  {
+    "ru": "Перезапусти Premiere Pro для подключения плагина сохранения и повтори попытку.",
+    "en": "Restart Premiere Pro to connect the save plugin, then try again."
+  },
+  {
+    "ru": "Premiere уже выполняет сохранение",
+    "en": "A Premiere save is already in progress"
+  },
+  {
+    "ru": "Premiere не ответил вовремя; архивная копия не создана",
+    "en": "Premiere save timed out; no archive copy created"
+  },
+  {
+    "ru": "Связь с плагином потеряна; архивная копия не создана",
+    "en": "Plugin disconnected; no archive copy created"
+  },
+  {
+    "ru": "Плагин не подтвердил выбранный проект",
+    "en": "Plugin did not confirm the selected project"
+  },
+  {
+    "ru": "Выбор изменился; архивная копия не создана.",
+    "en": "The selection changed; no archive copy was created."
+  },
+  {
+    "ru": "Активный проект Premiere не совпадает с выбранным проектом",
+    "en": "Active Premiere project does not match the selected project"
+  },
+  {
+    "ru": "Premiere не подтвердил сохранение",
+    "en": "Premiere did not confirm saving"
+  },
+  {
+    "ru": "Активный проект изменился во время сохранения",
+    "en": "Active project changed while saving"
+  },
+  {
+    "ru": "Сначала открой и сохрани проект Premiere",
+    "en": "Open and save a Premiere project first"
+  },
+  {
+    "ru": "Нет открытого сохранённого проекта",
+    "en": "No saved project open"
+  },
+  {
+    "ru": "Файл проекта не найден",
+    "en": "Project file is missing"
+  },
+  {
+    "ru": "Не удалось сохранить проект в Premiere",
+    "en": "Premiere save failed"
+  },
+  {
+    "ru": "Активный проект изменился",
+    "en": "Active project changed"
+  },
+  {
+    "ru": "Сохранённый файл недоступен",
+    "en": "Saved file unavailable"
+  },
+  {
+    "ru": "Установи Premiere Versions в «Программы» перед подготовкой плагина.",
+    "en": "Install Premiere Versions in Applications before preparing its plugin."
+  },
+  {
+    "ru": "Папка плагина занята другим расширением. Файлы не заменены.",
+    "en": "An unmanaged plugin occupies the installation folder; nothing was replaced."
+  },
+  {
+    "ru": "Установлена более новая версия плагина Premiere. Она сохранена.",
+    "en": "A newer Premiere plugin is installed; no downgrade was performed."
+  },
+  {
+    "ru": "Папка плагина перенаправлена символической ссылкой. Файлы не заменены.",
+    "en": "The plugin destination contains a symbolic link; nothing was replaced."
+  },
+  {
+    "ru": "Не удалось проверить встроенный плагин Premiere.",
+    "en": "Bundled Premiere plugin is invalid."
+  },
+  {
+    "ru": "Не удалось сохранить параметры соединения с плагином.",
+    "en": "Could not write local plugin configuration."
+  },
+  {
+    "ru": "Premiere уже выполняет сохранение проекта",
+    "en": "Premiere save already in progress"
   }
 ]

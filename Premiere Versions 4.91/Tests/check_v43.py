@@ -42,10 +42,15 @@ nonisolated final class MockProtocol: URLProtocol {
   check(PVLocalization.text("Версия \(personal) сохранена",language:"en")=="Version \(personal) saved","user value preserved")
   check(PVLocalization.text("comment",language:"ru")=="comment","designer English preserved")
   check(PVLocalization.text("press return",language:"ru")=="press return","designer hint preserved")
+  check(PVReleaseSource.permits(URL(string:"https://github.com/SNATCH-AGENCY/premiere_versions/releases/download/v4.91-build1/app.zip")!),"organization release trusted")
+  check(PVReleaseSource.permits(URL(string:"https://github.com/pewakkk/premiere_versions/releases/download/v4.9-build1/app.zip")!),"legacy redirect retained")
+  for value in ["https://github.com.evil.invalid/SNATCH-AGENCY/premiere_versions/releases/download/a.zip", "https://github.com/SNATCH-AGENCY/other/releases/download/a.zip", "https://github.com/SNATCH-AGENCY/premiere_versions/releases/download/v/../../../../other/a.zip", "https://user@github.com/SNATCH-AGENCY/premiere_versions/releases/download/a.zip"] {
+   check(!PVReleaseSource.permits(URL(string:value)!),"untrusted migrated release rejected")
+  }
   let xml="""
   <rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel>
   <item><sparkle:version>4.3.2</sparkle:version><sparkle:shortVersionString>4.3</sparkle:shortVersionString><enclosure url="https://github.com/pewakkk/premiere_versions/releases/download/v4.3-2/app.zip"/></item>
-  <item><sparkle:version>4.4.1</sparkle:version><sparkle:shortVersionString>4.4</sparkle:shortVersionString><enclosure url="https://github.com/pewakkk/premiere_versions/releases/download/v4.4/app.zip"/></item>
+  <item><sparkle:version>4.4.1</sparkle:version><sparkle:shortVersionString>4.4</sparkle:shortVersionString><enclosure url="https://github.com/SNATCH-AGENCY/premiere_versions/releases/download/v4.4/app.zip"/></item>
   <item><sparkle:version>99.1</sparkle:version><sparkle:shortVersionString>99</sparkle:shortVersionString><enclosure url="https://untrusted.invalid/app.zip"/></item>
   </channel></rss>
   """
